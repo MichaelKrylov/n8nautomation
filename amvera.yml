@@ -5,5 +5,12 @@ meta:
   toolchain:
     name: docker
     version: latest
-build: {}
-run: {}
+build:
+  dockerfile: Dockerfile
+  skip: false
+run:
+  image: null
+  command: null
+  args: null
+  persistenceMount: /data
+  containerPort: "80,5678"
