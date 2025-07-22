@@ -1,4 +1,3 @@
----
 version: null
 meta:
   environment: docker
@@ -9,8 +8,5 @@ build:
   dockerfile: Dockerfile
   skip: false
 run:
-  image: null
-  command: null
-  args: null
   persistenceMount: /data
-  containerPort: "80,5678"
+  containerPort: 5678
