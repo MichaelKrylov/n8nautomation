@@ -7,8 +7,6 @@ RUN apk update && \
         ffmpeg \
         tini  # Важно для корректного завершения процессов
 
-RUN mkdir -p /data && chown -R node:node /data
-
 USER node
 
 # Настройки n8n
