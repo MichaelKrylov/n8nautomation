@@ -3,6 +3,7 @@ FROM docker.n8n.io/n8nio/n8n:1.102.4
 
 USER root
 
+# ...existing code...
 RUN apk update && apk add --no-cache \
     python3 \
     py3-pip \
@@ -19,7 +20,8 @@ RUN apk update && apk add --no-cache \
     lapack-dev \
     gfortran
 
-RUN ln -sf python3 /usr/bin/python3
+# Удалено: RUN ln -sf python3 /usr/bin/python3
+
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip setuptools wheel
@@ -27,6 +29,7 @@ RUN pip install --no-cache-dir \
     numpy==1.26.0 \
     tensorflow==2.15.0 \
     spleeter==2.4.0
+# ...existing code...
 
 # Даем права на виртуальное окружение пользователю node
 RUN chown -R node:node /opt/venv
