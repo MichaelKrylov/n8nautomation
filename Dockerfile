@@ -32,9 +32,9 @@ RUN pip install --upgrade pip setuptools wheel
 
 # Устанавливаем совместимые версии пакетов
 RUN pip install --no-cache-dir \
-    numpy==1.26.0 \      # Современная версия, совместимая с Python 3.12
-    tensorflow==2.15.0 \ # Версия TensorFlow для Python 3.12
-    spleeter==2.4.0      # Последняя версия Spleeter
+    numpy==1.26.0 \
+    tensorflow==2.15.0 \
+    spleeter==2.4.0
 
 # Даем права на виртуальное окружение пользователю node
 RUN chown -R node:node /opt/venv
