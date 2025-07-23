@@ -5,9 +5,9 @@ USER root
 
 # ...existing code...
 RUN apk update && apk add --no-cache \
-    python3 \
-    py3-pip \
-    python3-dev \
+    python3=3.11.8-r0 \
+    py3-pip=23.2.1-r0 \
+    python3-dev=3.11.8-r0 \
     build-base \
     linux-headers \
     ffmpeg \
