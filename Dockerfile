@@ -19,8 +19,10 @@ RUN apk update && \
         lapack-dev \
         gfortran
 
-# Создаем симлинк для python
-RUN ln -sf python3 /usr/bin/python
+# Устанавливаем Python 3.10 (совместимый с TensorFlow 2.12)
+RUN apk add --no-cache python3.10 python3.10-dev && \
+    ln -sf python3.10 /usr/bin/python3 && \
+    ln -sf python3.10 /usr/bin/python
 
 # Создаем виртуальное окружение
 RUN python3 -m venv /opt/venv
