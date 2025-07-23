@@ -28,6 +28,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Обновляем pip и устанавливаем базовые пакеты
 RUN pip install --upgrade pip setuptools wheel
 
+RUN pip install spleeter
+
 # Устанавливаем numpy с версией, совместимой с Python 3.12
 RUN pip install numpy==1.25.0
 
