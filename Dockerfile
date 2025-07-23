@@ -19,26 +19,38 @@ RUN apk update && \
         lapack-dev \
         gfortran
 
-# Создаем симлинк для python (если нужно)
+# Создаем симлинк для python
 RUN ln -sf python3 /usr/bin/python
 
-# Обновляем pip и устанавливаем Spleeter
-RUN pip3 install --upgrade pip setuptools wheel && \
-    pip3 install tensorflow==2.12.0 && \
-    pip3 install spleeter
+# Создаем виртуальное окружение в системной директории
+RUN python3 -m venv /opt/venv
 
-# Предварительно скачиваем модели Spleeter (опционально, но ускорит первый запуск)
-RUN python3 -c "import spleeter; from spleeter.separator import Separator; Separator('spleeter:2stems-16kHz')"
+# Активируем виртуальное окружение и устанавливаем пакеты
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install tensorflow==2.12.0 && \
+    pip install spleeter
+
+# Предварительно скачиваем модели Spleeter для ускорения первого запуска
+RUN python3 -c "import spleeter; from spleeter.separator import Separator; Separator('spleeter:2stems-16kHz')" || echo "Model download failed, will download on first use"
+
+# Даем доступ к виртуальному окружению для node пользователя
+RUN chown -R node:node /opt/venv
 
 # Возвращаемся к пользователю node
 USER node
 
-# Настройки n8n
+# Настройки n8n для продакшена
 ENV N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
 ENV N8N_USER_FOLDER=/data
 ENV DB_TYPE=sqlite
 ENV DB_SQLITE_DATABASE=/data/database.sqlite
+ENV N8N_HOST=0.0.0.0
+ENV N8N_PORT=5678
 
-# Запуск через tini для обработки сигналов
+# Убеждаемся, что виртуальное окружение доступно
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Запуск через tini для корректной обработки сигналов
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["n8n", "start"]
