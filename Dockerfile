@@ -3,11 +3,10 @@ FROM docker.n8n.io/n8nio/n8n:1.102.4
 
 USER root
 
-# Устанавливаем Python 3.10 и необходимые зависимости
 RUN apk update && apk add --no-cache \
-    python3.10 \
+    python3 \
     py3-pip \
-    python3.10-dev \
+    python3-dev \
     build-base \
     linux-headers \
     ffmpeg \
@@ -20,19 +19,10 @@ RUN apk update && apk add --no-cache \
     lapack-dev \
     gfortran
 
-# Ссылка python3 -> python3.10
-RUN ln -sf python3.10 /usr/bin/python3
-
-# Создаем виртуальное окружение Python
+RUN ln -sf python3 /usr/bin/python3
 RUN python3 -m venv /opt/venv
-
-# Активируем виртуальное окружение
 ENV PATH="/opt/venv/bin:$PATH"
-
-# Обновляем pip и устанавливаем базовые пакеты
 RUN pip install --upgrade pip setuptools wheel
-
-# Устанавливаем совместимые версии пакетов
 RUN pip install --no-cache-dir \
     numpy==1.26.0 \
     tensorflow==2.15.0 \
