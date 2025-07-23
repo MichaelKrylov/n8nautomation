@@ -3,33 +3,19 @@ FROM docker.n8n.io/n8nio/n8n:1.102.4
 USER root
 
 # Устанавливаем системные зависимости
-RUN apk update && \
-    apk add --no-cache \
-        ffmpeg \
-        tini \
-        python3 \
-        py3-pip \
-        python3-dev \
-        gcc \
-        g++ \
-        musl-dev \
-        libffi-dev \
-        openblas-dev \
-        lapack-dev \
-        gfortran
+RUN apt-get update && apt-get install -y \
+    python3.11 python3.11-dev python3-pip \
+    ffmpeg tini gcc g++ libffi-dev libopenblas-dev liblapack-dev gfortran
 
 # Создаем виртуальное окружение
-RUN python3 -m venv /opt/venv
+RUN python3.11 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Устанавливаем Python-пакеты
 RUN pip install --upgrade pip setuptools wheel && \
     pip install tensorflow==2.16.2 spleeter
 
-# Предварительная загрузка моделей Spleeter
-RUN python3 -c "import spleeter; from spleeter.separator import Separator; Separator('spleeter:2stems-16kHz')" || echo "Model download failed"
-
-# Права на папку
+# Права
 RUN chown -R node:node /opt/venv
 
 USER node
