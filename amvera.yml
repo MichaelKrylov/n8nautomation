@@ -10,11 +10,10 @@ build:
 run:
   persistenceMount: /data
   containerPort: 5678
-  # Увеличиваем лимиты для работы с TensorFlow
+  # Лимиты ресурсов адекватны для TensorFlow
   resources:
     memory: 2Gi
     cpu: 1000m
-  # Переменные окружения для оптимизации
   env:
     - name: N8N_METRICS
       value: "false"
