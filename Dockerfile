@@ -19,10 +19,9 @@ RUN apk update && \
         lapack-dev \
         gfortran
 
-# Устанавливаем Python 3.10 (совместимый с TensorFlow 2.12)
-RUN apk add --no-cache python3.10 python3.10-dev && \
-    ln -sf python3.10 /usr/bin/python3 && \
-    ln -sf python3.10 /usr/bin/python
+# Устанавливаем Python 3.9 (который доступен в Alpine 3.22)
+RUN apk add --no-cache python3=3.9.18-r0 python3-dev=3.9.18-r0 && \
+    ln -sf python3 /usr/bin/python
 
 # Создаем виртуальное окружение
 RUN python3 -m venv /opt/venv
@@ -30,7 +29,7 @@ RUN python3 -m venv /opt/venv
 # Устанавливаем Python-пакеты
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install tensorflow==2.12.0 spleeter
+    pip install tensorflow==2.10.0 spleeter  # Используем версию TensorFlow, совместимую с Python 3.9
 
 # Предварительная загрузка моделей Spleeter
 RUN python3 -c "import spleeter; from spleeter.separator import Separator; Separator('spleeter:2stems-16kHz')" || echo "Model download failed"
