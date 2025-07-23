@@ -1,22 +1,26 @@
-# Используем стабильный образ n8n без указания debian (по умолчанию на базе debian)
+# Используем стабильный образ n8n (Alpine Linux)
 FROM docker.n8n.io/n8nio/n8n:latest
 
 # Переключаемся на root для установки пакетов
 USER root
 
-# Обновляем пакеты и устанавливаем необходимые зависимости
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Обновляем пакеты и устанавливаем необходимые зависимости для Alpine
+RUN apk update && apk add --no-cache \
     python3 \
-    python3-pip \
-    python3-venv \
+    py3-pip \
     python3-dev \
-    build-essential \
+    build-base \
+    linux-headers \
     ffmpeg \
     git \
-    && rm -rf /var/lib/apt/lists/*
+    gcc \
+    musl-dev \
+    libffi-dev \
+    openssl-dev
 
-# Создаем виртуальное окружение Python
-RUN python3 -m venv /opt/venv
+# Создаем виртуальное окружение Python (для Alpine нужно установить py3-venv)
+RUN apk add --no-cache py3-virtualenv && \
+    python3 -m venv /opt/venv
 
 # Активируем виртуальное окружение
 ENV PATH="/opt/venv/bin:$PATH"
