@@ -18,7 +18,7 @@ RUN apk update && apk add --no-cache \
     libffi-dev \
     openssl-dev
 
-# Создаем виртуальное окружение Python (для Alpine нужно установить py3-venv)
+# Создаем виртуальное окружение Python
 RUN apk add --no-cache py3-virtualenv && \
     python3 -m venv /opt/venv
 
@@ -28,8 +28,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Обновляем pip и устанавливаем базовые пакеты
 RUN pip install --upgrade pip setuptools wheel
 
-# Устанавливаем numpy отдельно с фиксированной версией для избежания конфликтов
-RUN pip install numpy==1.24.3
+# Устанавливаем numpy с версией, совместимой с Python 3.12
+RUN pip install numpy==1.25.0
 
 # Устанавливаем spleeter
 RUN pip install spleeter
