@@ -1,3 +1,4 @@
+# amvera.yml
 version: null
 meta:
   environment: docker
@@ -6,18 +7,7 @@ meta:
     version: latest
 build:
   dockerfile: Dockerfile
-  skip: false
+  skip: false 
 run:
   persistenceMount: /data
-  containerPort: 5678
-  # Увеличиваем ресурсы для TensorFlow и обработки аудио
-  resources:
-    memory: 2Gi
-    cpu: 1000m
-  env:
-    - name: N8N_METRICS
-      value: "false"
-    - name: NODE_OPTIONS
-      value: "--max-old-space-size=2048"
-    - name: N8N_DISABLE_PRODUCTION_MAIN_PROCESS
-      value: "false"
+  containerPort: 5678 
