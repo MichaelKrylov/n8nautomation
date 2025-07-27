@@ -1,11 +1,20 @@
 FROM docker.n8n.io/n8nio/n8n:1.102.4
 
-# Установка ffmpeg (с явным указанием пакетов)
 USER root
+
+# Установка ffmpeg и базовых шрифтов
 RUN apk update && \
     apk add --no-cache \
         ffmpeg \
-        tini  # Важно для корректного завершения процессов
+        fontconfig \
+        ttf-dejavu \
+        ttf-liberation \
+        ttf-opensans \
+        tini
+
+# Обновление кэша шрифтов
+RUN fc-cache -fv
+
 USER node
 
 # Настройки n8n
