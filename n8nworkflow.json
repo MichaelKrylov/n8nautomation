@@ -1,0 +1,6716 @@
+{
+  "name": "n8nworkflow",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/public/{{ $json.body.Key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        4304
+      ],
+      "id": "ec399d68-f43f-4b97-bc2e-c288a94bfc75",
+      "name": "Get Video Supabase1"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/video_blurred.mp4",
+        "options": {
+          "append": false
+        }
+      },
+      "name": "Get Binary Video1",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        4304
+      ],
+      "id": "64c4e11b-4798-484f-aee6-da6c09e3a0d2"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/video_input.mp4",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        2912
+      ],
+      "id": "3d8048dd-1fd2-42ef-8146-4f769de9e794",
+      "name": "Save Input Video"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=# ШАГ 1: Размываем область старых субтитров и убираем звук\nffmpeg -y -i /tmp/video_input.mp4 -vf \"delogo=x=158:y=880:w=403:h=90:show=0\" -an /tmp/video_blurred_nosound.mp4\n\n# ШАГ 2: Извлекаем аудио для транскрипции\nffmpeg -y -i /tmp/video_input.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 /tmp/audio_for_transcription.wav\n\necho \"Видео размыто, звук удален, аудио извлечено для транскрипции\""
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2496,
+        2912
+      ],
+      "id": "25594d53-0000-4632-a715-894e25ee3326",
+      "name": "Process Video + Extract Audio"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/audio_for_transcription.wav",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        832,
+        3376
+      ],
+      "id": "0ad22b00-edff-4f87-ab3a-e6fbb811a140",
+      "name": "Read Audio"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        3376
+      ],
+      "id": "321b0473-b720-445f-b0b3-987e4a87809b",
+      "name": "Upload Audio"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/transcript",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n\"audio_url\": \"{{ $json.upload_url }}\",\n\"speaker_labels\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1232,
+        3376
+      ],
+      "id": "8d270c48-22e9-4335-a8f3-5a2b37806b6f",
+      "name": "Start Transcription"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.assemblyai.com/v2/transcript/{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1632,
+        3376
+      ],
+      "id": "ace5ec38-c37a-41e2-b5dc-e1748d5dde6b",
+      "name": "Get Transcription"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1872,
+        3376
+      ],
+      "id": "bf897c0e-5b6e-4f1c-ae85-9205dca16fbd",
+      "name": "Check Status"
+    },
+    {
+      "parameters": {
+        "jsCode": "const transcript = $json[\"text\"];\nconst words = $json[\"words\"];\n\n// Только фиолетовый и белый\nconst colors = ['ffffff', 'ff00ff'];\nlet colorIndex = 0;\n\nif (!words || words.length === 0) {\n    const sentences = transcript.split(/[.!?]+/).filter(s => s.trim().length > 0);\n    let srtOutput = \"\";\n    sentences.forEach((sentence, index) => {\n        const startTime = formatTime(index * 3000);\n        const endTime = formatTime((index + 1) * 3000);\n        const color = colors[colorIndex % colors.length];\n        colorIndex++;\n        srtOutput += `${index + 1}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${sentence.trim().toUpperCase()}\\n\\n`;\n    });\n    return [{ json: { srt: srtOutput, text: transcript } }];\n}\n\nlet srtOutput = \"\";\nlet segmentIndex = 1;\nconst segmentLength = 2500;\nconst maxWords = 4;\nlet currentSegment = [];\nlet segmentStartTime = 0;\n\nfor (const word of words) {\n    if (currentSegment.length === 0) {\n        segmentStartTime = word.start;\n        currentSegment.push(word);\n    } else if (\n        word.start - segmentStartTime > segmentLength ||\n        currentSegment.length >= maxWords\n    ) {\n        const startMs = segmentStartTime;\n        const endMs = currentSegment[currentSegment.length - 1].end;\n        const startTime = formatTime(startMs);\n        const endTime = formatTime(endMs);\n        const text = currentSegment.map(w => w.text.toUpperCase()).join(' ');\n        \n        const color = colors[colorIndex % colors.length];\n        colorIndex++;\n        srtOutput += `${segmentIndex}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${text}\\n\\n`;\n        \n        segmentIndex++;\n        currentSegment = [word];\n        segmentStartTime = word.start;\n    } else {\n        currentSegment.push(word);\n    }\n}\n\nif (currentSegment.length > 0) {\n    const startMs = segmentStartTime;\n    const endMs = currentSegment[currentSegment.length - 1].end;\n    const startTime = formatTime(startMs);\n    const endTime = formatTime(endMs);\n    const text = currentSegment.map(w => w.text.toUpperCase()).join(' ');\n    \n    const color = colors[colorIndex % colors.length];\n    srtOutput += `${segmentIndex}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${text}\\n\\n`;\n}\n\nfunction formatTime(milliseconds) {\n    const totalSeconds = Math.floor(milliseconds / 1000);\n    const hours = Math.floor(totalSeconds / 3600);\n    const minutes = Math.floor((totalSeconds % 3600) / 60);\n    const seconds = totalSeconds % 60;\n    const ms = milliseconds % 1000;\n    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;\n}\n\nreturn [{ json: { srt: srtOutput, text: transcript } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        3360
+      ],
+      "id": "105c9931-6182-4eff-97ea-c608692b413d",
+      "name": "Generate SRT"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=ffmpeg -y \\\n  -i /tmp/video_blurred_nosound.mp4 \\\n  -i /tmp/backgroundmusic.flac \\\n  -filter_complex \"\n    [1:a]volume=0.1,afade=in:st=0:d=1,afade=out:st=20:d=2[audio_bg]\n  \" \\\n  -vf \"subtitles=/tmp/subtitles_new.srt:force_style='FontName=Open Sans,FontSize=18,Bold=1,OutlineColour=&H000000,Outline=1,Shadow=0,MarginV=90,Spacing=-0.5,ScaleX=0.95,ScaleY=0.90'\" \\\n  -map 0:v \\\n  -map \"[audio_bg]\" \\\n  -c:v libx264 -c:a aac \\\n  -shortest \\\n  /tmp/video_final_with_subs.mp4"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        864,
+        3856
+      ],
+      "id": "74c78284-3169-44dc-8de1-7bca6632f924",
+      "name": "Add New Subtitles"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_final_with_subs.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        3856
+      ],
+      "id": "88733d5f-bfe7-434a-8b40-3e77d770432d",
+      "name": "Read Final Video"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_input.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2224,
+        2912
+      ],
+      "id": "071f2ea2-3086-4a35-91c4-c5d21d693f34",
+      "name": "Save Video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "Mzc2N2FlNzRhYmQ0NGYyYmJhYTJiNmQ1MjQ4OTg3YzktMTY5MzM4MjU5MA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"video_inputs\": [\n    {\n      \"character\": {\n        \"type\": \"avatar\",\n        \"avatar_id\": \"August_Casual_Front2_public\",\n        \"avatar_style\": \"normal\",\n        \"offset\": {\n          \"x\": 0.0,\n          \"y\": 0.05\n        },\n        \"scale\": 1.5,\n        \"matting\": true\n      },\n      \"voice\": {\n        \"type\": \"text\",\n        \"input_text\": \"{{ $('Generate SRT').item.json.text }}\",\n        \"voice_id\": \"d2f4f24783d04e22ab49ee8fdc3715e0\",\n        \"speed\": 1.5,\n        \"pitch\": 50,\n        \"emotion\": \"Excited\"\n      },\n      \"background\": {\n        \"type\": \"color\",\n        \"value\": \"#008000\"\n      }\n    }\n  ],\n  \"dimension\": {\n    \"width\": 720,\n    \"height\": 1280\n  },\n  \"caption\": false,\n  \"title\": \"Avatar Video\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1376,
+        3856
+      ],
+      "id": "d0e3d3c9-c220-41c8-98a0-5a387e59a2cb",
+      "name": "Generate Avatar Video"
+    },
+    {
+      "parameters": {
+        "url": "https://api.heygen.com/v1/video_status.get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "video_id",
+              "value": "={{ $json.data.video_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "Mzc2N2FlNzRhYmQ0NGYyYmJhYTJiNmQ1MjQ4OTg3YzktMTY5MzM4MjU5MA=="
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1888,
+        3856
+      ],
+      "id": "49a44281-cca4-4df8-8b7a-8f63703090bd",
+      "name": "Get Avatar Status"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.data.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2352,
+        3856
+      ],
+      "id": "c250edb9-dfaf-4621-96ce-5aa776984453",
+      "name": "Download Avatar"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/heygen_avatar.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        3856
+      ],
+      "id": "90301452-a43f-42cc-9679-133edb2a6a13",
+      "name": "Save Avatar"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=ffmpeg -y \\\n-i /tmp/video_final_with_subs.mp4 \\\n-i /tmp/heygen_avatar.mp4 \\\n-filter_complex \"[1:v]chromakey=color=green:similarity=0.09:blend=0.08,scale=600:-1,crop=500:500:50:0[avatar];[0:v][avatar]overlay=x=-30:y=main_h-overlay_h[video_with_avatar];[0:a][1:a]amix=inputs=2:duration=shortest[mixed_audio]\" \\\n-map \"[video_with_avatar]\" \\\n-map \"[mixed_audio]\" \\\n-c:v libx264 -c:a aac \\\n-shortest \\\n/tmp/video_with_avatar_final.mp4"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        4304
+      ],
+      "id": "dd35a366-434a-4c38-b700-737de6337bf5",
+      "name": "Combine Videos"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e58a9617-5cee-4f43-9772-e65b22fdc858",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2496,
+        2464
+      ],
+      "id": "a637d5bb-1d4f-4965-bf80-423d7dbad3f4",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.piapi.ai/api/v1/task",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "e96cfc81ab01e6f9e7ad1de9e95e50a85ca24e1a21d25061baf0e94bb9b0183a"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"Qubico/diffrhythm\",\n  \"task_type\": \"txt2audio-base\",\n  \"input\": {\n    \"lyrics\": \"\",\n    \"style_prompt\": \"ambient electronic background music, minimal techno, soft synthesizers, subtle beats, corporate presentation style, non-intrusive, professional atmosphere, no vocals, clean production, suitable for voice-over content, inspirational but not distracting, modern business vibe\",\n    \"style_audio\": \"\"\n  },\n  \"config\": {\n    \"webhook_config\": {\n      \"endpoint\": \"\",\n      \"secret\": \"\"\n    }\n  }\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1712,
+        2464
+      ],
+      "id": "af9f281b-484d-4c03-96ec-520e9226a93f",
+      "name": "Create Music"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.piapi.ai/api/v1/task/{{ $json.data.task_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "e96cfc81ab01e6f9e7ad1de9e95e50a85ca24e1a21d25061baf0e94bb9b0183a"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2256,
+        2464
+      ],
+      "id": "cdc633fb-1bf9-44d6-9836-b4101857e405",
+      "name": "Get Music"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.data.output.audio_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        832,
+        2912
+      ],
+      "id": "a87df659-2fac-4796-bdc3-606b4ca28baf",
+      "name": "Load Music"
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2016,
+        2464
+      ],
+      "id": "739df04c-6cef-48d4-881a-5fd7a4a594c3",
+      "name": "Wait Music",
+      "webhookId": "cd18e466-8ab9-48e0-83b9-5d4a4953f148"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "new"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1408,
+        2464
+      ],
+      "id": "68d58b38-1d98-4c2e-b0ee-d9550b01c880",
+      "name": "Get Video"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/backgroundmusic.flac",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        2912
+      ],
+      "id": "10dba9a6-be08-48d0-8f0e-186dd3e7ffe3",
+      "name": "Save Input Music"
+    },
+    {
+      "parameters": {
+        "tableId": "videos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ $('TikTok Scraper').item.json.createTimeISO }}"
+            },
+            {
+              "fieldId": "caption",
+              "fieldValue": "={{ $json.data }}"
+            },
+            {
+              "fieldId": "source",
+              "fieldValue": "=nikkomontanez"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "new1"
+            },
+            {
+              "fieldId": "video_url",
+              "fieldValue": "={{ $('TikTok Scraper').item.json.mediaUrls[0] }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        288
+      ],
+      "id": "42a4f7ff-1e5b-4262-ab13-bcfe72bdf04e",
+      "name": "Add Database"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/backgroundmusic.flac",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        2912
+      ],
+      "id": "02837d20-623f-4950-a875-31409e5f8842",
+      "name": "Save Music"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2112,
+        3856
+      ],
+      "id": "fdf8dc5b-b285-46bf-a65d-c66e6dd3382d",
+      "name": "Check Status Video"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        3376
+      ],
+      "id": "4c76bc0f-69a8-40ba-93e6-0e461287e043",
+      "name": "Wait Transcription",
+      "webhookId": "cf58c73e-c246-44a7-8804-a704b82706c3"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_with_avatar_final.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        4304
+      ],
+      "id": "837aad9f-8889-4cb8-86dd-59ddeface6f2",
+      "name": "Save Final Video"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/subtitles_new.srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2672,
+        3360
+      ],
+      "id": "e0716df4-a184-46b4-923b-78b64cf78d1b",
+      "name": "Save Sub"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2368,
+        3360
+      ],
+      "id": "73372410-073d-4c08-912c-d03b38ad33f0",
+      "name": "Convert Sub"
+    },
+    {
+      "parameters": {
+        "amount": 8,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1616,
+        3856
+      ],
+      "id": "f1c2ed11-f98f-414b-b2bd-1a0ed01a6f26",
+      "name": "Wait Avatar",
+      "webhookId": "015f3202-4ef9-4547-b1fb-66953ebb78d8"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/video/{{ $('Generate Unique ID1').item.json.file_name }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1728,
+        4304
+      ],
+      "id": "0d8c5aa6-06ef-407b-8644-61991332d4a8",
+      "name": "Loading Supabase1",
+      "notes": "Политика доступа\nЗаменить 'n8' на свой bucket\n\nDROP POLICY \"Allow upload for anon key\" ON storage.objects;\nCREATE POLICY \"Allow upload for anon key\" ON storage.objects\nFOR INSERT\nWITH CHECK ((bucket_id = 'n8'::text) AND (auth.role() = 'anon'::text));"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Генерируем уникальное имя файла (12 символов)\nfunction generateUniqueId(length = 12) {\n  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';\n  let result = '';\n  for (let i = 0; i < length; i++) {\n    result += chars.charAt(Math.floor(Math.random() * chars.length));\n  }\n  return result;\n}\n\nconst uniqueId = generateUniqueId();\nconst fileName = `video_${uniqueId}.mp4`;\n\nreturn {\n  unique_id: uniqueId,\n  file_name: fileName,\n  timestamp: new Date().toISOString(),\n  status: 'pending'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        4304
+      ],
+      "id": "b6fe634f-f28d-475b-8388-18817a317ae0",
+      "name": "Generate Unique ID1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot7622962404:AAHrXvzIsTu3PXm7hPxD26lnS3Csbpb4Wzo/sendVideo",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "1929720358"
+            },
+            {
+              "name": "parse_mode",
+              "value": "HTML"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "reply_markup",
+              "value": "={\n \"inline_keyboard\": [\n   [\n     {\"text\": \"✅ Опубликовать\", \"callback_data\": \"publish_{{ $('Generate Unique ID1').item.json.unique_id }}\"}\n   ],\n   [\n     {\"text\": \"🎬 Новое видео\", \"callback_data\": \"new_video_{{ $('Generate Unique ID1').item.json.unique_id }}\"}\n   ],\n   [\n     {\"text\": \"🗑 Удалить\", \"callback_data\": \"delete_{{ $('Generate Unique ID1').item.json.unique_id }}\"}\n   ]\n ]\n}"
+            },
+            {
+              "name": "supports_streaming",
+              "value": "true"
+            },
+            {
+              "name": "width",
+              "value": "1080"
+            },
+            {
+              "name": "height",
+              "value": "1920"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2480,
+        4304
+      ],
+      "id": "ee6d4087-4a07-4b9a-9dbf-c5b0c339fc86",
+      "name": "Send Video to Telegram1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "original_video_key",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Video').item.json.original_video_key }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "processed_video_key",
+              "fieldValue": "={{ $('Loading Supabase1').item.json.body.Key }}"
+            },
+            {
+              "fieldId": "unique_id",
+              "fieldValue": "={{ $('Generate Unique ID1').item.json.unique_id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2688,
+        4304
+      ],
+      "id": "c9374d48-9df6-4c3d-aa9f-98995833fe1a",
+      "name": "Get Video1"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        4480,
+        432
+      ],
+      "id": "f4b289f2-f7a0-4715-9d0f-e55b9399ab63",
+      "name": "Telegram Trigger",
+      "webhookId": "8f840b5f-6650-441f-b78d-47bdc560a489"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "publish",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "id": "97f297ca-b9f3-4b0b-b2bf-79f1a6153ff8"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Publish"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2201d8cf-c8ba-49cc-bf51-54905191f106",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "new",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "New Video"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "bb34c9fb-82d2-4ab0-a8e8-b1ba679ccb24",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "delete",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Delete"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5852f402-e1bf-4c35-a608-2e427fb194b6",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Сancel"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2ea7f4d7-5093-4879-96f0-00d033f2b4e1",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "next",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Next"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        4736,
+        400
+      ],
+      "id": "f59455df-100f-478f-8568-7734dec14769",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "deleteMessage",
+        "chatId": "1929720358",
+        "messageId": "={{ $('Telegram Trigger').item.json.callback_query.message.message_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4752,
+        816
+      ],
+      "id": "f0dccdf3-dea8-489b-87f1-9bebee6da162",
+      "name": "Delete a chat message",
+      "webhookId": "3a90ed22-94b5-4103-abed-0208e0532974"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "unique_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.callback_query.data.replace('publish_', '') }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "sent"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5136,
+        160
+      ],
+      "id": "af859093-a587-4a84-a58f-54db6ee13147",
+      "name": "Get Video3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot7622962404:AAHrXvzIsTu3PXm7hPxD26lnS3Csbpb4Wzo/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": {{$('Telegram Trigger').item.json.callback_query.message.chat.id}},\n  \"message_id\": {{$('Telegram Trigger').item.json.callback_query.message.message_id}},\n  \"reply_markup\": {\n    \"inline_keyboard\": [\n      [\n        {\n          \"text\": \"❌ Снять с очереди\",\n          \"callback_data\": \"cancel_{{ $json.unique_id }}\"\n        }\n      ]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5392,
+        160
+      ],
+      "id": "ade3c7d8-f015-447c-be28-81df9577d859",
+      "name": "Edit Keyboard2"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "unique_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.callback_query.data.replace('cancel_', '') }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5168,
+        704
+      ],
+      "id": "6972e12f-140d-4b65-9225-c8d862c38ea6",
+      "name": "Get Video4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot7622962404:AAHrXvzIsTu3PXm7hPxD26lnS3Csbpb4Wzo/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Telegram Trigger').item.json.callback_query.message.chat.id }}\",\n  \"message_id\": \"{{ $('Telegram Trigger').item.json.callback_query.message.message_id }}\",\n  \"reply_markup\": {\n    \"inline_keyboard\": [\n      [\n        {\"text\": \"✅ Опубликовать\", \"callback_data\": \"publish_{{ $json.unique_id }}\"}\n      ],\n      [\n        {\"text\": \"🎬 Новое видео\", \"callback_data\": \"new_video_{{ $json.unique_id }}\"}\n      ],\n      [\n        {\"text\": \"🗑 Удалить\", \"callback_data\": \"delete_{{ $json.unique_id }}\"}\n      ]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5440,
+        704
+      ],
+      "id": "aa788a33-ae0b-4184-b97c-856655ba0df3",
+      "name": "Edit Keyboard"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "sent"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        384,
+        880
+      ],
+      "id": "6ae46fc7-89ff-4680-8dcb-e72b4734837b",
+      "name": "Get Video2"
+    },
+    {
+      "parameters": {
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/public/{{ $('Get Video2').item.json.processed_video_key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1904,
+        896
+      ],
+      "id": "e4a4065c-d061-46a8-92df-edf6d3959853",
+      "name": "Get Video Supabase2"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        880
+      ],
+      "id": "14a29207-0fa4-4264-a3a9-4534e9da5055",
+      "name": "Send Post"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.upload-post.com/api/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Apikey eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6IjI5MDM2MDNAZ21haWwuY29tIiwiZXhwIjo0OTA3NjU2Njg4LCJqdGkiOiI4YTE2NTQ5NS05NTM1LTQ2MmYtOGI5Yy1lYzk1YTNlOGUxZTUifQ.GN6QTrPgP3_OvEEF1fwFm20I2Kk5HRlWGfyTmWNBGyQ"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "user",
+              "value": "11"
+            },
+            {
+              "name": "platform[]",
+              "value": "instagram"
+            },
+            {
+              "name": "media_type",
+              "value": "REELS"
+            },
+            {
+              "name": "share_to_feed",
+              "value": "true"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2256,
+        464
+      ],
+      "id": "a2ce37e6-98f8-42eb-ad9f-293774691bdf",
+      "name": "Send Inst"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "33e4399e-d085-4057-b1ef-fb010394617f",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2672,
+        464
+      ],
+      "id": "fb5c3925-2112-4028-bb39-16805c701b9b",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "text": "🎬  Видео успешно отправлено в Inst",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3104,
+        144
+      ],
+      "id": "8f9b876f-01b9-4fa7-8744-510cc0cb6a23",
+      "name": "Success  Message",
+      "webhookId": "1d5b00ef-ffb7-4a83-b4e8-0091ba4efaf8"
+    },
+    {
+      "parameters": {
+        "text": "⚠️  Ошибка отправки видео в Inst",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3104,
+        480
+      ],
+      "id": "df5b851b-44d0-4006-8050-a8c2005bb4d2",
+      "name": "Eror  Message",
+      "webhookId": "1d5b00ef-ffb7-4a83-b4e8-0091ba4efaf8"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.upload-post.com/api/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Apikey eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6IjI5MDM2MDNAZ21haWwuY29tIiwiZXhwIjo0OTA3NjU2Njg4LCJqdGkiOiI4YTE2NTQ5NS05NTM1LTQ2MmYtOGI5Yy1lYzk1YTNlOGUxZTUifQ.GN6QTrPgP3_OvEEF1fwFm20I2Kk5HRlWGfyTmWNBGyQ"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "Your Video Title"
+            },
+            {
+              "name": "user",
+              "value": "11"
+            },
+            {
+              "name": "platform[]",
+              "value": "tiktok"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        1328
+      ],
+      "id": "7068a90b-c312-467a-be44-92940af03a86",
+      "name": "Send TikTok"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "33e4399e-d085-4057-b1ef-fb010394617f",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2656,
+        1360
+      ],
+      "id": "0d107d9c-7e5a-4b96-b12d-3fdf1a58cb89",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "text": "🎬  Видео успешно отправлено в Inst",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3104,
+        1216
+      ],
+      "id": "736f021a-b278-48db-89b9-7634a516fadf",
+      "name": "Success  Message1",
+      "webhookId": "1d5b00ef-ffb7-4a83-b4e8-0091ba4efaf8"
+    },
+    {
+      "parameters": {
+        "text": "⚠️  Ошибка отправки видео в Inst",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3104,
+        1456
+      ],
+      "id": "8a75e3b0-9829-4d4e-87e4-6c4f774ace38",
+      "name": "Eror  Message1",
+      "webhookId": "1d5b00ef-ffb7-4a83-b4e8-0091ba4efaf8"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.upload-post.com/api/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Apikey eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6IjI5MDM2MDNAZ21haWwuY29tIiwiZXhwIjo0OTA3NjU2Njg4LCJqdGkiOiI4YTE2NTQ5NS05NTM1LTQ2MmYtOGI5Yy1lYzk1YTNlOGUxZTUifQ.GN6QTrPgP3_OvEEF1fwFm20I2Kk5HRlWGfyTmWNBGyQ"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "video",
+              "value": "={{ $('Get Link Video').item.json.publicVideoUrl }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $('Create Title').item.json.generated_title }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $('Create Title').item.json.generated_description }}"
+            },
+            {
+              "name": "user",
+              "value": "11"
+            },
+            {
+              "name": "platform[]",
+              "value": "youtube"
+            },
+            {
+              "name": "tags[]",
+              "value": "howto"
+            },
+            {
+              "name": "categoryId",
+              "value": "22"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2256,
+        896
+      ],
+      "id": "b7bcc33b-4ddc-48d1-b300-32137746fc70",
+      "name": "Send YouTube"
+    },
+    {
+      "parameters": {
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/public/{{ $('Get Video').item.json.original_video_key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1728,
+        2912
+      ],
+      "id": "58bc2efb-7161-4db8-a9ef-52b76aef5878",
+      "name": "Get Video Supabase3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем данные от предыдущего узла\nconst inputData = $input.all()[0].json;\n\n// Проверяем наличие данных\nif (!inputData || !inputData.processed_video_key) {\n  throw new Error(\"❌ Отсутствует processed_video_key!\");\n}\n\n// Извлекаем processed_video_key\nconst videoKey = inputData.processed_video_key; // Например, 'video/video_ovvKb7TLg8DG.mp4'\n\n// Указываем URL проекта Supabase\nconst supabaseProjectUrl = 'https://amhfcqfsugtoxsgrqdfa.supabase.co';\n\n// Формируем публичную ссылку на видео\nconst publicVideoUrl = `${supabaseProjectUrl}/storage/v1/object/public/${videoKey}`;\n\n// Возвращаем результат для следующего узла\nreturn [\n  {\n    json: {\n      videoKey: videoKey,\n      publicVideoUrl: publicVideoUrl,\n      originalData: inputData\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        880
+      ],
+      "id": "6226357b-36b9-4eac-8892-2f96efe711f9",
+      "name": "Get Link Video"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Ты креативный контент-мейкер ютюб канала.\n\nТвоя задача на основе описания видео:{{ $json.originalData.caption }}\n\nсоздать короткий, привлекательный и цепляющий  Title и Description для видео на англ языке.\n\nВ конечном итоге, должен получится креативный, привлекательный и клибальное название и описание к видео. Пометь отдельно заголовок и описание как:  \n\n- Title: \n- Description: \n ",
+              "role": "assistant"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        944,
+        880
+      ],
+      "id": "1e92d6f7-1fe7-4a89-b205-67d01ba71190",
+      "name": "Message a model"
+    },
+    {
+      "parameters": {
+        "chatId": "=1929720358",
+        "text": "🎬 Видео генерируется, это займёт ≈15 мин. Пожалуйста, дождитесь загрузки.\n\n⚠️ Если видео не загрузилось, попробуйте снова. Если ошибка повторяется — напишите в поддержку.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1152,
+        2464
+      ],
+      "id": "f6b3584b-5d6d-46e4-b093-5111b432c88f",
+      "name": "Notice",
+      "webhookId": "521c5366-229f-4be1-beb9-6896d8fd45ec"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем данные из предыдущего шага\nconst responseData = $input.item.json;\n\n// Находим контент в массиве (может быть в разных структурах)\nlet content = '';\nif (Array.isArray(responseData) && responseData.length > 0) {\n  content = responseData[0].message?.content || responseData[0].content || '';\n} else if (responseData.message?.content) {\n  content = responseData.message.content;\n} else if (responseData.content) {\n  content = responseData.content;\n}\n\n// Извлекаем Title и Description\nconst titleMatch = content.match(/- Title:\\s*(.*?)(?=\\n- Description:|\\n\\n|$)/s);\nconst descriptionMatch = content.match(/- Description:\\s*(.*?)(?=\\n#|$)/s);\n\nconst title = titleMatch ? titleMatch[1].trim() : '';\nconst description = descriptionMatch ? descriptionMatch[1].trim() : '';\n\n// Возвращаем результат\nreturn {\n  ...($input.item.json),\n  generated_title: title,\n  generated_description: description,\n  original_content: content\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        896
+      ],
+      "id": "243967d6-5cfd-49fe-9aab-1738dfe0a30f",
+      "name": "Create Title"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "33e4399e-d085-4057-b1ef-fb010394617f",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2688,
+        896
+      ],
+      "id": "8d81a80e-4921-46c4-81a0-00836eee23c2",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "text": "🎬  Видео успешно отправлено в Inst",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3104,
+        720
+      ],
+      "id": "2f1ffa67-d1cf-40f1-8c91-24f1dfc6a904",
+      "name": "Success  Message2",
+      "webhookId": "1d5b00ef-ffb7-4a83-b4e8-0091ba4efaf8"
+    },
+    {
+      "parameters": {
+        "text": "⚠️  Ошибка отправки видео в Inst",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3104,
+        944
+      ],
+      "id": "4d66d48e-d330-4875-8225-53e132d4d019",
+      "name": "Eror  Message3",
+      "webhookId": "1d5b00ef-ffb7-4a83-b4e8-0091ba4efaf8"
+    },
+    {
+      "parameters": {
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/public/{{ $json.body.Key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5808,
+        4288
+      ],
+      "id": "ba2cc67d-6f3a-4c41-955c-689789b26fe5",
+      "name": "Get Video Supabase"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/video_blurred.mp4",
+        "options": {
+          "append": false
+        }
+      },
+      "name": "Get Binary Video",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        6064,
+        4288
+      ],
+      "id": "b9cfdb9b-a721-48b7-beec-73f113c3d748"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/video_input.mp4",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        5696,
+        2896
+      ],
+      "id": "1eecbdcf-d4bb-4b14-bd02-5e055a3f94c0",
+      "name": "Save Input Video1"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=# ШАГ 1: Размываем область старых субтитров и убираем звук\nffmpeg -y -i /tmp/video_input.mp4 -vf \"delogo=x=158:y=880:w=403:h=90:show=0\" -an /tmp/video_blurred_nosound.mp4\n\n# ШАГ 2: Извлекаем аудио для транскрипции\nffmpeg -y -i /tmp/video_input.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 /tmp/audio_for_transcription.wav\n\necho \"Видео размыто, звук удален, аудио извлечено для транскрипции\""
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        6304,
+        2896
+      ],
+      "id": "93f822f5-4bdd-4f22-b740-4744ef7b02f4",
+      "name": "Process Video + Extract Audio1"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/audio_for_transcription.wav",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        4640,
+        3360
+      ],
+      "id": "bdf01663-b688-4844-8c4f-cfd6d6c77a17",
+      "name": "Read Audio1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4848,
+        3360
+      ],
+      "id": "49fb93f6-887f-4de2-ab3e-c8d572c14628",
+      "name": "Upload Audio1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/transcript",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n\"audio_url\": \"{{ $json.upload_url }}\",\n\"speaker_labels\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5040,
+        3360
+      ],
+      "id": "95fe3ea1-8281-4471-bbd0-ae3344de0fb8",
+      "name": "Start Transcription1"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.assemblyai.com/v2/transcript/{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5440,
+        3360
+      ],
+      "id": "74185498-4b87-4841-a89a-a36042340b9d",
+      "name": "Get Transcription1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5680,
+        3360
+      ],
+      "id": "52232e48-c052-4a40-a9ff-0210dd40206a",
+      "name": "Check Status1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const transcript = $json[\"text\"];\nconst words = $json[\"words\"];\n\n// Только фиолетовый и белый\nconst colors = ['ffffff', 'ff00ff'];\nlet colorIndex = 0;\n\nif (!words || words.length === 0) {\n    const sentences = transcript.split(/[.!?]+/).filter(s => s.trim().length > 0);\n    let srtOutput = \"\";\n    sentences.forEach((sentence, index) => {\n        const startTime = formatTime(index * 3000);\n        const endTime = formatTime((index + 1) * 3000);\n        const color = colors[colorIndex % colors.length];\n        colorIndex++;\n        srtOutput += `${index + 1}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${sentence.trim().toUpperCase()}\\n\\n`;\n    });\n    return [{ json: { srt: srtOutput, text: transcript } }];\n}\n\nlet srtOutput = \"\";\nlet segmentIndex = 1;\nconst segmentLength = 2500;\nconst maxWords = 4;\nlet currentSegment = [];\nlet segmentStartTime = 0;\n\nfor (const word of words) {\n    if (currentSegment.length === 0) {\n        segmentStartTime = word.start;\n        currentSegment.push(word);\n    } else if (\n        word.start - segmentStartTime > segmentLength ||\n        currentSegment.length >= maxWords\n    ) {\n        const startMs = segmentStartTime;\n        const endMs = currentSegment[currentSegment.length - 1].end;\n        const startTime = formatTime(startMs);\n        const endTime = formatTime(endMs);\n        const text = currentSegment.map(w => w.text.toUpperCase()).join(' ');\n        \n        const color = colors[colorIndex % colors.length];\n        colorIndex++;\n        srtOutput += `${segmentIndex}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${text}\\n\\n`;\n        \n        segmentIndex++;\n        currentSegment = [word];\n        segmentStartTime = word.start;\n    } else {\n        currentSegment.push(word);\n    }\n}\n\nif (currentSegment.length > 0) {\n    const startMs = segmentStartTime;\n    const endMs = currentSegment[currentSegment.length - 1].end;\n    const startTime = formatTime(startMs);\n    const endTime = formatTime(endMs);\n    const text = currentSegment.map(w => w.text.toUpperCase()).join(' ');\n    \n    const color = colors[colorIndex % colors.length];\n    srtOutput += `${segmentIndex}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${text}\\n\\n`;\n}\n\nfunction formatTime(milliseconds) {\n    const totalSeconds = Math.floor(milliseconds / 1000);\n    const hours = Math.floor(totalSeconds / 3600);\n    const minutes = Math.floor((totalSeconds % 3600) / 60);\n    const seconds = totalSeconds % 60;\n    const ms = milliseconds % 1000;\n    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;\n}\n\nreturn [{ json: { srt: srtOutput, text: transcript } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5936,
+        3344
+      ],
+      "id": "6cce9598-58d9-4591-97b6-40b99a56b99b",
+      "name": "Generate SRT1"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=ffmpeg -y \\\n  -i /tmp/video_blurred_nosound.mp4 \\\n  -i /tmp/backgroundmusic.flac \\\n  -filter_complex \"\n    [1:a]volume=0.1,afade=in:st=0:d=1,afade=out:st=20:d=2[audio_bg]\n  \" \\\n  -vf \"subtitles=/tmp/subtitles_new.srt:force_style='FontName=Open Sans,FontSize=18,Bold=1,OutlineColour=&H000000,Outline=1,Shadow=0,MarginV=90,Spacing=-0.5,ScaleX=0.95,ScaleY=0.90'\" \\\n  -map 0:v \\\n  -map \"[audio_bg]\" \\\n  -c:v libx264 -c:a aac \\\n  -shortest \\\n  /tmp/video_final_with_subs.mp4"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4672,
+        3840
+      ],
+      "id": "3e06a044-9b18-47fc-a044-101c18f37d20",
+      "name": "Add New Subtitles1"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_final_with_subs.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        4928,
+        3840
+      ],
+      "id": "cf53b215-481e-4ae5-bd65-4c86f674e107",
+      "name": "Read Final Video1"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_input.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        6032,
+        2896
+      ],
+      "id": "96be6c37-4f52-46a4-959f-5806099bf11b",
+      "name": "Save Video1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "Mzc2N2FlNzRhYmQ0NGYyYmJhYTJiNmQ1MjQ4OTg3YzktMTY5MzM4MjU5MA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"video_inputs\": [\n    {\n      \"character\": {\n        \"type\": \"avatar\",\n        \"avatar_id\": \"August_Casual_Front2_public\",\n        \"avatar_style\": \"normal\",\n        \"offset\": {\n          \"x\": 0.0,\n          \"y\": 0.05\n        },\n        \"scale\": 1.5,\n        \"matting\": true\n      },\n      \"voice\": {\n        \"type\": \"text\",\n        \"input_text\": \"{{ $('Generate SRT1').item.json.text }}\",\n        \"voice_id\": \"d2f4f24783d04e22ab49ee8fdc3715e0\",\n        \"speed\": 1.5,\n        \"pitch\": 50,\n        \"emotion\": \"Excited\"\n      },\n      \"background\": {\n        \"type\": \"color\",\n        \"value\": \"#008000\"\n      }\n    }\n  ],\n  \"dimension\": {\n    \"width\": 720,\n    \"height\": 1280\n  },\n  \"caption\": false,\n  \"title\": \"Avatar Video\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5184,
+        3840
+      ],
+      "id": "d14116f3-7419-4263-91de-9c947ff90b23",
+      "name": "Generate Avatar Video1"
+    },
+    {
+      "parameters": {
+        "url": "https://api.heygen.com/v1/video_status.get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "video_id",
+              "value": "={{ $json.data.video_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "Mzc2N2FlNzRhYmQ0NGYyYmJhYTJiNmQ1MjQ4OTg3YzktMTY5MzM4MjU5MA=="
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5696,
+        3840
+      ],
+      "id": "7f574d84-df26-4009-88ac-4826a4833767",
+      "name": "Get Avatar Status1"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.data.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6160,
+        3840
+      ],
+      "id": "5e4f31af-de9a-4675-8b16-9313a23796f3",
+      "name": "Download Avatar1"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/heygen_avatar.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        6432,
+        3840
+      ],
+      "id": "7aa598f0-2d58-4a40-90b7-c98b28d27d0f",
+      "name": "Save Avatar1"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=ffmpeg -y \\\n-i /tmp/video_final_with_subs.mp4 \\\n-i /tmp/heygen_avatar.mp4 \\\n-filter_complex \"[1:v]chromakey=color=green:similarity=0.09:blend=0.08,scale=600:-1,crop=500:500:50:0[avatar];[0:v][avatar]overlay=x=-30:y=main_h-overlay_h[video_with_avatar];[0:a][1:a]amix=inputs=2:duration=shortest[mixed_audio]\" \\\n-map \"[video_with_avatar]\" \\\n-map \"[mixed_audio]\" \\\n-c:v libx264 -c:a aac \\\n-shortest \\\n/tmp/video_with_avatar_final.mp4"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4896,
+        4288
+      ],
+      "id": "3301f20d-5255-4145-b841-009391ce31a8",
+      "name": "Combine Videos1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e58a9617-5cee-4f43-9772-e65b22fdc858",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6000,
+        2432
+      ],
+      "id": "0a43bcc9-f5b8-45fd-906e-82c8dfa7b275",
+      "name": "If4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.piapi.ai/api/v1/task",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "e96cfc81ab01e6f9e7ad1de9e95e50a85ca24e1a21d25061baf0e94bb9b0183a"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"Qubico/diffrhythm\",\n  \"task_type\": \"txt2audio-base\",\n  \"input\": {\n    \"lyrics\": \"\",\n    \"style_prompt\": \"ambient electronic background music, minimal techno, soft synthesizers, subtle beats, corporate presentation style, non-intrusive, professional atmosphere, no vocals, clean production, suitable for voice-over content, inspirational but not distracting, modern business vibe\",\n    \"style_audio\": \"\"\n  },\n  \"config\": {\n    \"webhook_config\": {\n      \"endpoint\": \"\",\n      \"secret\": \"\"\n    }\n  }\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5216,
+        2432
+      ],
+      "id": "233f1a03-7a32-46a4-8503-8ff410014cf3",
+      "name": "Create Music1"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.piapi.ai/api/v1/task/{{ $json.data.task_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "e96cfc81ab01e6f9e7ad1de9e95e50a85ca24e1a21d25061baf0e94bb9b0183a"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5760,
+        2432
+      ],
+      "id": "746b2b58-1e7b-44bb-bd9e-3affeb321c1e",
+      "name": "Get Music1"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.data.output.audio_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6304,
+        2416
+      ],
+      "id": "efe6202e-d14c-4172-b830-af86fc4d27de",
+      "name": "Load Music1"
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5520,
+        2432
+      ],
+      "id": "548457ca-eeb0-4649-9e3c-e70d9284297e",
+      "name": "Wait Music1",
+      "webhookId": "cd18e466-8ab9-48e0-83b9-5d4a4953f148"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "new"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4912,
+        2432
+      ],
+      "id": "8a160bbf-006f-4c00-82a8-576784499ddd",
+      "name": "Get Video5"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/backgroundmusic.flac",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        4624,
+        2896
+      ],
+      "id": "5c9ce3ef-c7fe-4d53-a873-a9a9bd4b6d66",
+      "name": "Save Input Music1"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/backgroundmusic.flac",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        4960,
+        2896
+      ],
+      "id": "3d8202f3-dfec-4008-a8da-7faba498b947",
+      "name": "Save Music1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5920,
+        3840
+      ],
+      "id": "60fd0c03-52cd-4dd6-9b6d-b569bc2bb26a",
+      "name": "Check Status Video1"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5248,
+        3360
+      ],
+      "id": "b7f97e21-db2d-4322-8745-bee7ebd92520",
+      "name": "Wait Transcription1",
+      "webhookId": "cf58c73e-c246-44a7-8804-a704b82706c3"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_with_avatar_final.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        5232,
+        4288
+      ],
+      "id": "b999652e-ef9e-4166-9b27-3920a084dc50",
+      "name": "Save Final Video1"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/subtitles_new.srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        6480,
+        3344
+      ],
+      "id": "f07fb797-7ed8-47bd-b649-b0b2ca5a2bb1",
+      "name": "Save Sub1"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        6176,
+        3344
+      ],
+      "id": "3643dd19-5dee-4e73-bde1-055ab0a953fb",
+      "name": "Convert Sub1"
+    },
+    {
+      "parameters": {
+        "amount": 8,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5424,
+        3840
+      ],
+      "id": "a37dcc72-b59b-4c1e-903f-ed7db3650d2d",
+      "name": "Wait Avatar1",
+      "webhookId": "015f3202-4ef9-4547-b1fb-66953ebb78d8"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/video/{{ $('Generate Unique ID2').item.json.file_name }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5536,
+        4288
+      ],
+      "id": "32194d0a-71eb-475c-8708-04015fe774cc",
+      "name": "Loading Supabase",
+      "notes": "Политика доступа\nЗаменить 'n8' на свой bucket\n\nDROP POLICY \"Allow upload for anon key\" ON storage.objects;\nCREATE POLICY \"Allow upload for anon key\" ON storage.objects\nFOR INSERT\nWITH CHECK ((bucket_id = 'n8'::text) AND (auth.role() = 'anon'::text));"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Генерируем уникальное имя файла (12 символов)\nfunction generateUniqueId(length = 12) {\n  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';\n  let result = '';\n  for (let i = 0; i < length; i++) {\n    result += chars.charAt(Math.floor(Math.random() * chars.length));\n  }\n  return result;\n}\n\nconst uniqueId = generateUniqueId();\nconst fileName = `video_${uniqueId}.mp4`;\n\nreturn {\n  unique_id: uniqueId,\n  file_name: fileName,\n  timestamp: new Date().toISOString(),\n  status: 'pending'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4624,
+        4288
+      ],
+      "id": "f5d2d4a9-ae93-4679-87de-7a370f7e68b3",
+      "name": "Generate Unique ID2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot7622962404:AAHrXvzIsTu3PXm7hPxD26lnS3Csbpb4Wzo/sendVideo",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "1929720358"
+            },
+            {
+              "name": "parse_mode",
+              "value": "HTML"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "reply_markup",
+              "value": "={\n \"inline_keyboard\": [\n   [\n     {\"text\": \"✅ Опубликовать\", \"callback_data\": \"publish_{{ $('Generate Unique ID2').item.json.unique_id }}\"}\n   ],\n   [\n     {\"text\": \"🎬 Новое видео\", \"callback_data\": \"new_video_{{ $('Generate Unique ID2').item.json.unique_id }}\"}\n   ],\n   [\n     {\"text\": \"🗑 Удалить\", \"callback_data\": \"delete_{{ $('Generate Unique ID2').item.json.unique_id }}\"}\n   ]\n ]\n}"
+            },
+            {
+              "name": "supports_streaming",
+              "value": "true"
+            },
+            {
+              "name": "width",
+              "value": "1080"
+            },
+            {
+              "name": "height",
+              "value": "1920"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6288,
+        4288
+      ],
+      "id": "e62b0b93-655c-4416-8b5a-c4f48943311a",
+      "name": "Send Video to Telegram"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "original_video_key",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Video5').item.json.original_video_key }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "processed_video_key",
+              "fieldValue": "={{ $('Loading Supabase').item.json.body.Key }}"
+            },
+            {
+              "fieldId": "unique_id",
+              "fieldValue": "={{ $('Generate Unique ID2').item.json.unique_id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        6496,
+        4288
+      ],
+      "id": "2b40407a-9aa5-4ee5-88ae-4059977d2170",
+      "name": "Get Video6"
+    },
+    {
+      "parameters": {
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/public/{{ $('Get Video5').item.json.original_video_key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5360,
+        2896
+      ],
+      "id": "3eb68854-7d9c-4dfc-8045-7ecee3916b83",
+      "name": "Get Video Supabase4"
+    },
+    {
+      "parameters": {
+        "chatId": "=1929720358",
+        "text": "🎬 Видео генерируется, это займёт ≈15 мин. Пожалуйста, дождитесь загрузки.\n\n⚠️ Если видео не загрузилось, попробуйте снова. Если ошибка повторяется — напишите в поддержку.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4656,
+        2432
+      ],
+      "id": "7d70afde-e691-4223-96a9-399ba768e00c",
+      "name": "Notice1",
+      "webhookId": "521c5366-229f-4be1-beb9-6896d8fd45ec"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n    \"username\": [\"excelbranding\"],\n    \"resultsLimit\": 5,\n    \"sort\": \"newest\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1760,
+        592
+      ],
+      "id": "d1bb6fce-3f80-40bd-8bff-7c3679171dfc",
+      "name": "Inst Scraper1"
+    },
+    {
+      "parameters": {
+        "tableId": "videos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ $('Split Videos1').item.json.latestComments[0].timestamp }}"
+            },
+            {
+              "fieldId": "caption",
+              "fieldValue": "={{ $('Split Videos1').item.json.caption }}"
+            },
+            {
+              "fieldId": "likes_count",
+              "fieldValue": "={{ $json.likesCount || $json.like_count || 0 }}"
+            },
+            {
+              "fieldId": "video_view_count",
+              "fieldValue": "={{ $json.videoViewCount || $json.video_views || $json.views || 0 }}"
+            },
+            {
+              "fieldId": "source",
+              "fieldValue": "excelbranding"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "new"
+            },
+            {
+              "fieldId": "original_video_key",
+              "fieldValue": "={{ $json.body.Key }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        592
+      ],
+      "id": "ed95bb75-e65d-4a33-8a3e-b97e587487f0",
+      "name": "Add Database1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/video/{{ $json.file_name }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -768,
+        592
+      ],
+      "id": "9fa37378-59f6-4af3-9d03-9043e2eb906e",
+      "name": "Loading Supabase3",
+      "notes": "Политика доступа\nЗаменить 'n8' на свой bucket\n\nDROP POLICY \"Allow upload for anon key\" ON storage.objects;\nCREATE POLICY \"Allow upload for anon key\" ON storage.objects\nFOR INSERT\nWITH CHECK ((bucket_id = 'n8'::text) AND (auth.role() = 'anon'::text));"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1472,
+        576
+      ],
+      "id": "fcb8840e-a050-4fdf-8047-2903f8bfb001",
+      "name": "Split Videos1",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Split Videos1').item.json.videoUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1008,
+        592
+      ],
+      "id": "f0d2526a-6425-4d13-b462-ae0610723663",
+      "name": "Download Video"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Генерируем уникальное имя файла (12 символов)\nfunction generateUniqueId(length = 12) {\n  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';\n  let result = '';\n  for (let i = 0; i < length; i++) {\n    result += chars.charAt(Math.floor(Math.random() * chars.length));\n  }\n  return result;\n}\n\nconst uniqueId = generateUniqueId();\nconst fileName = `original_video_${uniqueId}.mp4`;\n\nreturn {\n  unique_id: uniqueId,\n  file_name: fileName,\n  timestamp: new Date().toISOString(),\n  status: 'pending'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        592
+      ],
+      "id": "e7f2b58a-7548-47c4-9bc7-db85905bcf67",
+      "name": "Generate Unique ID3"
+    },
+    {
+      "parameters": {
+        "chatId": "1929720358",
+        "text": "⚠️  Ошибка загрузки данных в БД",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1488,
+        896
+      ],
+      "id": "748e2d06-9954-41e0-ada7-5495788e5acc",
+      "name": "Eror  Message4",
+      "webhookId": "1d5b00ef-ffb7-4a83-b4e8-0091ba4efaf8"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2096,
+        592
+      ],
+      "id": "cb425b6a-850d-4701-bc13-2c8e79754d12",
+      "name": "Scraper Inst"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2096,
+        288
+      ],
+      "id": "38783ca7-4ff9-4acb-9142-4c14a8cc19bc",
+      "name": "Scraper TikTok"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Get Video7').item.json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1376,
+        2896
+      ],
+      "id": "f84e8a47-560c-4152-a9fd-3c5a1639a3c7",
+      "name": "Download TikTok Video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n    \"excludePinnedPosts\": true,\n    \"profileScrapeSections\": [\n        \"videos\"\n    ],\n    \"profileSorting\": \"latest\",\n    \"profiles\": [\n        \"nikko.montanez\"\n    ],\n    \"proxyCountryCode\": \"None\",\n    \"resultsPerPage\": 5,\n    \"scrapeRelatedVideos\": false,\n    \"shouldDownloadAvatars\": false,\n    \"shouldDownloadCovers\": false,\n    \"shouldDownloadMusicCovers\": false,\n    \"shouldDownloadSlideshowImages\": false,\n    \"shouldDownloadSubtitles\": true,\n    \"shouldDownloadVideos\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1824,
+        288
+      ],
+      "id": "cde74ef8-cccf-45c4-960f-936a194b2973",
+      "name": "TikTok Scraper"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.videoMeta.subtitleLinks[0].downloadLink }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1552,
+        288
+      ],
+      "id": "17deda01-0acf-4960-ba40-6528ba012fb7",
+      "name": "Download TikTok Sub"
+    },
+    {
+      "parameters": {
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/public/{{ $json.body.Key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1088,
+        4288
+      ],
+      "id": "e05a1375-bb7b-4149-bf81-ba550dbd0695",
+      "name": "Get Video Supabase5"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/video_blurred.mp4",
+        "options": {
+          "append": false
+        }
+      },
+      "name": "Get Binary Video2",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        4288
+      ],
+      "id": "a4c92b29-4e1c-402c-a5af-83a6a2025e05"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/video_input.mp4",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        2896
+      ],
+      "id": "307f0127-6e73-4e52-a8a8-94725be7885e",
+      "name": "Save Input Video2"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=# ШАГ 1: Размываем две области субтитров и убираем звук\nffmpeg -y -i /tmp/video_input.mp4 \\\n-vf \"delogo=x=60:y=600:w=490:h=90:show=0,delogo=x=80:y=70:w=403:h=100:show=0\" \\\n-an /tmp/video_blurred_nosound.mp4\n\n# ШАГ 2: Извлекаем аудио для транскрипции\nffmpeg -y -i /tmp/video_input.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 /tmp/audio_for_transcription.wav\n\necho \"Две области размыты (основная немного выше + новая вверху), звук удален, аудио извлечено для транскрипции\""
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        2896
+      ],
+      "id": "d1a09304-f497-4b80-8825-c22875e88345",
+      "name": "Process Video + Extract Audio2"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/audio_for_transcription.wav",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -2256,
+        3360
+      ],
+      "id": "f6098755-f27c-4b50-b6d8-70d2540940f1",
+      "name": "Read Audio2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2048,
+        3360
+      ],
+      "id": "8211cc7e-cd02-44ed-8400-4becdb3b7165",
+      "name": "Upload Audio2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/transcript",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n\"audio_url\": \"{{ $json.upload_url }}\",\n\"speaker_labels\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1856,
+        3360
+      ],
+      "id": "57f9434b-0b1e-4690-8db9-414c8a5b7ffd",
+      "name": "Start Transcription2"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.assemblyai.com/v2/transcript/{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1456,
+        3360
+      ],
+      "id": "3e10eb72-fb02-4c1f-815e-ef78ae491038",
+      "name": "Get Transcription2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1216,
+        3360
+      ],
+      "id": "526eea85-00dc-49f7-8d85-560cee0d30c0",
+      "name": "Check Status2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const transcript = $json[\"text\"];\nconst words = $json[\"words\"];\n\n// Только фиолетовый и белый\nconst colors = ['ffffff', 'ff00ff'];\nlet colorIndex = 0;\n\nif (!words || words.length === 0) {\n    const sentences = transcript.split(/[.!?]+/).filter(s => s.trim().length > 0);\n    let srtOutput = \"\";\n    sentences.forEach((sentence, index) => {\n        const startTime = formatTime(index * 3000);\n        const endTime = formatTime((index + 1) * 3000);\n        const color = colors[colorIndex % colors.length];\n        colorIndex++;\n        srtOutput += `${index + 1}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${sentence.trim().toUpperCase()}\\n\\n`;\n    });\n    return [{ json: { srt: srtOutput, text: transcript } }];\n}\n\nlet srtOutput = \"\";\nlet segmentIndex = 1;\nconst segmentLength = 2500;\nconst maxWords = 4;\nlet currentSegment = [];\nlet segmentStartTime = 0;\n\nfor (const word of words) {\n    if (currentSegment.length === 0) {\n        segmentStartTime = word.start;\n        currentSegment.push(word);\n    } else if (\n        word.start - segmentStartTime > segmentLength ||\n        currentSegment.length >= maxWords\n    ) {\n        const startMs = segmentStartTime;\n        const endMs = currentSegment[currentSegment.length - 1].end;\n        const startTime = formatTime(startMs);\n        const endTime = formatTime(endMs);\n        const text = currentSegment.map(w => w.text.toUpperCase()).join(' ');\n        \n        const color = colors[colorIndex % colors.length];\n        colorIndex++;\n        srtOutput += `${segmentIndex}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${text}\\n\\n`;\n        \n        segmentIndex++;\n        currentSegment = [word];\n        segmentStartTime = word.start;\n    } else {\n        currentSegment.push(word);\n    }\n}\n\nif (currentSegment.length > 0) {\n    const startMs = segmentStartTime;\n    const endMs = currentSegment[currentSegment.length - 1].end;\n    const startTime = formatTime(startMs);\n    const endTime = formatTime(endMs);\n    const text = currentSegment.map(w => w.text.toUpperCase()).join(' ');\n    \n    const color = colors[colorIndex % colors.length];\n    srtOutput += `${segmentIndex}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${text}\\n\\n`;\n}\n\nfunction formatTime(milliseconds) {\n    const totalSeconds = Math.floor(milliseconds / 1000);\n    const hours = Math.floor(totalSeconds / 3600);\n    const minutes = Math.floor((totalSeconds % 3600) / 60);\n    const seconds = totalSeconds % 60;\n    const ms = milliseconds % 1000;\n    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;\n}\n\nreturn [{ json: { srt: srtOutput, text: transcript } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        3344
+      ],
+      "id": "0828cb0f-3381-4920-beb5-0bc5231c52af",
+      "name": "Generate SRT2"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=ffmpeg -y \\\n  -i /tmp/video_blurred_nosound.mp4 \\\n  -i /tmp/backgroundmusic.flac \\\n  -filter_complex \"\n    [1:a]volume=0.1,afade=in:st=0:d=1,afade=out:st=20:d=2[audio_bg]\n  \" \\\n  -vf \"subtitles=/tmp/subtitles_new.srt:force_style='FontName=Open Sans,FontSize=18,Bold=1,OutlineColour=&H000000,Outline=1,Shadow=0,MarginV=120,Spacing=-0.5,ScaleX=0.95,ScaleY=0.90'\" \\\n  -map 0:v \\\n  -map \"[audio_bg]\" \\\n  -c:v libx264 -c:a aac \\\n  -shortest \\\n  /tmp/video_final_with_subs.mp4"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -2224,
+        3840
+      ],
+      "id": "ec8acc4b-ec7f-478c-9898-0fa229f58dcd",
+      "name": "Add New Subtitles2"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_final_with_subs.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -1968,
+        3840
+      ],
+      "id": "99d27403-ca98-4ece-be1d-767c835e8248",
+      "name": "Read Final Video2"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_input.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -864,
+        2896
+      ],
+      "id": "7dd8c633-991c-4353-8857-6ce18c0800e0",
+      "name": "Save Video2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "Mzc2N2FlNzRhYmQ0NGYyYmJhYTJiNmQ1MjQ4OTg3YzktMTY5MzM4MjU5MA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"video_inputs\": [\n    {\n      \"character\": {\n        \"type\": \"avatar\",\n        \"avatar_id\": \"August_Casual_Front2_public\",\n        \"avatar_style\": \"normal\",\n        \"offset\": {\n          \"x\": 0.0,\n          \"y\": 0.05\n        },\n        \"scale\": 1.5,\n        \"matting\": true\n      },\n      \"voice\": {\n        \"type\": \"text\",\n        \"input_text\": \"{{ $('Generate SRT2').item.json.text }}\",\n        \"voice_id\": \"d2f4f24783d04e22ab49ee8fdc3715e0\",\n        \"speed\": 1.5,\n        \"pitch\": 50,\n        \"emotion\": \"Excited\"\n      },\n      \"background\": {\n        \"type\": \"color\",\n        \"value\": \"#008000\"\n      }\n    }\n  ],\n  \"dimension\": {\n    \"width\": 720,\n    \"height\": 1280\n  },\n  \"caption\": false,\n  \"title\": \"Avatar Video\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1712,
+        3840
+      ],
+      "id": "3ec885e5-57e9-4f91-95ff-81115c2f063a",
+      "name": "Generate Avatar Video2"
+    },
+    {
+      "parameters": {
+        "url": "https://api.heygen.com/v1/video_status.get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "video_id",
+              "value": "={{ $json.data.video_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "Mzc2N2FlNzRhYmQ0NGYyYmJhYTJiNmQ1MjQ4OTg3YzktMTY5MzM4MjU5MA=="
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1264,
+        3840
+      ],
+      "id": "61b5ab1d-220a-4226-876b-0d2638452919",
+      "name": "Get Avatar Status2"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.data.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -736,
+        3840
+      ],
+      "id": "edb57e83-d117-4bf7-991b-a675cf29184f",
+      "name": "Download Avatar2"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/heygen_avatar.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        3840
+      ],
+      "id": "4e394eae-af55-4cf8-9998-3d78457b1b0b",
+      "name": "Save Avatar2"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=ffmpeg -y \\\n-i /tmp/video_final_with_subs.mp4 \\\n-i /tmp/heygen_avatar.mp4 \\\n-filter_complex \"[1:v]chromakey=color=green:similarity=0.09:blend=0.08,scale=600:-1,crop=500:500:50:0[avatar];[0:v][avatar]overlay=x=-30:y=main_h-overlay_h[video_with_avatar];[0:a][1:a]amix=inputs=2:duration=shortest[mixed_audio]\" \\\n-map \"[video_with_avatar]\" \\\n-map \"[mixed_audio]\" \\\n-c:v libx264 -c:a aac \\\n-shortest \\\n/tmp/video_with_avatar_final.mp4"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -2000,
+        4288
+      ],
+      "id": "30b121dd-dfc0-4208-91e2-b2bf1cb9985c",
+      "name": "Combine Videos2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e58a9617-5cee-4f43-9772-e65b22fdc858",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -592,
+        2448
+      ],
+      "id": "11997b87-ed31-426a-841f-595babd53cf8",
+      "name": "If5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.piapi.ai/api/v1/task",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "e96cfc81ab01e6f9e7ad1de9e95e50a85ca24e1a21d25061baf0e94bb9b0183a"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"Qubico/diffrhythm\",\n  \"task_type\": \"txt2audio-base\",\n  \"input\": {\n    \"lyrics\": \"\",\n    \"style_prompt\": \"ambient electronic background music, minimal techno, soft synthesizers, subtle beats, corporate presentation style, non-intrusive, professional atmosphere, no vocals, clean production, suitable for voice-over content, inspirational but not distracting, modern business vibe\",\n    \"style_audio\": \"\"\n  },\n  \"config\": {\n    \"webhook_config\": {\n      \"endpoint\": \"\",\n      \"secret\": \"\"\n    }\n  }\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1376,
+        2448
+      ],
+      "id": "98a8cafe-f5e7-4583-ad0d-74dec92d5699",
+      "name": "Create Music2"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.piapi.ai/api/v1/task/{{ $json.data.task_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "e96cfc81ab01e6f9e7ad1de9e95e50a85ca24e1a21d25061baf0e94bb9b0183a"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -832,
+        2448
+      ],
+      "id": "cbb6dda8-4b83-45c0-9923-9dcd79a0f4b6",
+      "name": "Get Music2"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.data.output.audio_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2256,
+        2896
+      ],
+      "id": "a4d45d47-3a51-4522-ae7e-37a9b8cb1059",
+      "name": "Load Music2"
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1072,
+        2448
+      ],
+      "id": "06a3420f-8a47-4059-9368-f295108f8d95",
+      "name": "Wait Music2",
+      "webhookId": "cd18e466-8ab9-48e0-83b9-5d4a4953f148"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "new1"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1680,
+        2448
+      ],
+      "id": "1f4959dc-95b3-4f26-be3e-f27294b6e093",
+      "name": "Get Video7"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/backgroundmusic.flac",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -1952,
+        2896
+      ],
+      "id": "27229c44-c2a8-49bf-9eac-34fbfc9b8ae2",
+      "name": "Save Input Music2"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/backgroundmusic.flac",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -1664,
+        2896
+      ],
+      "id": "6519b866-8dbd-4c5c-b0d3-b3c6ef9eb764",
+      "name": "Save Music2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -976,
+        3840
+      ],
+      "id": "4e16bd78-d506-4795-8e14-30ee5dd79e29",
+      "name": "Check Status Video2"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1648,
+        3360
+      ],
+      "id": "496fed6f-4c19-46e9-8ec3-cff18f51a809",
+      "name": "Wait Transcription2",
+      "webhookId": "cf58c73e-c246-44a7-8804-a704b82706c3"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_with_avatar_final.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -1664,
+        4288
+      ],
+      "id": "d6228a55-77f1-4862-a305-939abaace001",
+      "name": "Save Final Video2"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/subtitles_new.srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        3344
+      ],
+      "id": "1582e5c9-6b8f-4d0b-b84b-1f0b9c5ddc86",
+      "name": "Save Sub2"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        3344
+      ],
+      "id": "88f473cc-1551-4929-847c-5211d9a37902",
+      "name": "Convert Sub2"
+    },
+    {
+      "parameters": {
+        "amount": 8,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1472,
+        3840
+      ],
+      "id": "b1879e01-dbb5-4304-b058-249e4bcc7d2a",
+      "name": "Wait Avatar2",
+      "webhookId": "015f3202-4ef9-4547-b1fb-66953ebb78d8"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/video/{{ $('Generate Unique ID4').item.json.file_name }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1360,
+        4288
+      ],
+      "id": "e8edc7c3-0483-4f5f-9a99-f83d34bf42db",
+      "name": "Loading Supabase4",
+      "notes": "Политика доступа\nЗаменить 'n8' на свой bucket\n\nDROP POLICY \"Allow upload for anon key\" ON storage.objects;\nCREATE POLICY \"Allow upload for anon key\" ON storage.objects\nFOR INSERT\nWITH CHECK ((bucket_id = 'n8'::text) AND (auth.role() = 'anon'::text));"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Генерируем уникальное имя файла (12 символов)\nfunction generateUniqueId(length = 12) {\n  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';\n  let result = '';\n  for (let i = 0; i < length; i++) {\n    result += chars.charAt(Math.floor(Math.random() * chars.length));\n  }\n  return result;\n}\n\nconst uniqueId = generateUniqueId();\nconst fileName = `video_${uniqueId}.mp4`;\n\nreturn {\n  unique_id: uniqueId,\n  file_name: fileName,\n  timestamp: new Date().toISOString(),\n  status: 'pending'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2272,
+        4288
+      ],
+      "id": "a237bc2a-e457-483c-9ac1-27fbff9d4fb0",
+      "name": "Generate Unique ID4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot7622962404:AAHrXvzIsTu3PXm7hPxD26lnS3Csbpb4Wzo/sendVideo",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "1929720358"
+            },
+            {
+              "name": "parse_mode",
+              "value": "HTML"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "reply_markup",
+              "value": "={\n \"inline_keyboard\": [\n   [\n     {\"text\": \"✅ Опубликовать\", \"callback_data\": \"publish_{{ $('Generate Unique ID4').item.json.unique_id }}\"}\n   ],\n   [\n     {\"text\": \"🎬 Новое видео\", \"callback_data\": \"next_video_{{ $('Generate Unique ID4').item.json.unique_id }}\"}\n   ],\n   [\n     {\"text\": \"🗑 Удалить\", \"callback_data\": \"delete_{{ $('Generate Unique ID4').item.json.unique_id }}\"}\n   ]\n ]\n}"
+            },
+            {
+              "name": "supports_streaming",
+              "value": "true"
+            },
+            {
+              "name": "width",
+              "value": "1080"
+            },
+            {
+              "name": "height",
+              "value": "1920"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -608,
+        4288
+      ],
+      "id": "e47cb06d-092c-445d-b1b7-8e6181c9bc9f",
+      "name": "Send Video to Telegram2"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "unique_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Generate Unique ID4').item.json.unique_id }}"
+            },
+            {
+              "keyName": "video_url",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Video7').item.json.video_url }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        4288
+      ],
+      "id": "49270f4e-c38e-4c47-86b0-46af9c648519",
+      "name": "Get Video8"
+    },
+    {
+      "parameters": {
+        "chatId": "=1929720358",
+        "text": "🎬 Видео генерируется, это займёт ≈15 мин. Пожалуйста, дождитесь загрузки.\n\n⚠️ Если видео не загрузилось, попробуйте снова. Если ошибка повторяется — напишите в поддержку.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1936,
+        2448
+      ],
+      "id": "db29ceae-3319-4fb9-a37b-d91da56fc123",
+      "name": "Notice2",
+      "webhookId": "521c5366-229f-4be1-beb9-6896d8fd45ec"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        816,
+        2464
+      ],
+      "id": "4b227ab3-15d4-43d9-ba5f-779b4d15fe77",
+      "name": "Moderation Inst"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2272,
+        2448
+      ],
+      "id": "03c4a8cf-476f-49bc-81a4-e600b7e71ebb",
+      "name": "Moderation TikTok"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Get Video9').item.json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9712,
+        944
+      ],
+      "id": "4aa66909-b292-4686-8d28-5fe80104c59e",
+      "name": "Download TikTok Video1"
+    },
+    {
+      "parameters": {
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/public/{{ $json.body.Key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9968,
+        2336
+      ],
+      "id": "6b63910b-b331-4ea6-87a4-4b5ca4562ed9",
+      "name": "Get Video Supabase6"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/video_blurred.mp4",
+        "options": {
+          "append": false
+        }
+      },
+      "name": "Get Binary Video3",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        10224,
+        2336
+      ],
+      "id": "3f1c7b68-2845-4f9b-8d78-49abce5f0282"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/video_input.mp4",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        10000,
+        944
+      ],
+      "id": "562dde98-e44b-4ee0-b344-7368d7ed8d16",
+      "name": "Save Input Video3"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=# ШАГ 1: Размываем две области субтитров и убираем звук\nffmpeg -y -i /tmp/video_input.mp4 \\\n-vf \"delogo=x=90:y=600:w=403:h=90:show=0,delogo=x=80:y=90:w=403:h=90:show=0\" \\\n-an /tmp/video_blurred_nosound.mp4\n\n# ШАГ 2: Извлекаем аудио для транскрипции\nffmpeg -y -i /tmp/video_input.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 /tmp/audio_for_transcription.wav\n\necho \"Две области размыты (основная немного выше + новая вверху), звук удален, аудио извлечено для транскрипции\""
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        10464,
+        944
+      ],
+      "id": "8b86e79a-640a-4fbd-a5bf-d7940c485613",
+      "name": "Process Video + Extract Audio3"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/audio_for_transcription.wav",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        8800,
+        1408
+      ],
+      "id": "0ed3dbea-25de-488d-8aa0-00b412abd816",
+      "name": "Read Audio3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9008,
+        1408
+      ],
+      "id": "d39155c4-243d-4409-b94c-69597036ae76",
+      "name": "Upload Audio3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/transcript",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n\"audio_url\": \"{{ $json.upload_url }}\",\n\"speaker_labels\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9200,
+        1408
+      ],
+      "id": "ed19c88b-3e01-4d23-855d-6647eddcbcf4",
+      "name": "Start Transcription3"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.assemblyai.com/v2/transcript/{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "dbadd6e4aebf466ba7ceae2d77139a2e"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9600,
+        1408
+      ],
+      "id": "9e37c130-29ba-495f-9fda-2605bb551eff",
+      "name": "Get Transcription3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        9840,
+        1408
+      ],
+      "id": "4698026d-6709-41cc-9af5-217b1c92645d",
+      "name": "Check Status3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const transcript = $json[\"text\"];\nconst words = $json[\"words\"];\n\n// Только фиолетовый и белый\nconst colors = ['ffffff', 'ff00ff'];\nlet colorIndex = 0;\n\nif (!words || words.length === 0) {\n    const sentences = transcript.split(/[.!?]+/).filter(s => s.trim().length > 0);\n    let srtOutput = \"\";\n    sentences.forEach((sentence, index) => {\n        const startTime = formatTime(index * 3000);\n        const endTime = formatTime((index + 1) * 3000);\n        const color = colors[colorIndex % colors.length];\n        colorIndex++;\n        srtOutput += `${index + 1}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${sentence.trim().toUpperCase()}\\n\\n`;\n    });\n    return [{ json: { srt: srtOutput, text: transcript } }];\n}\n\nlet srtOutput = \"\";\nlet segmentIndex = 1;\nconst segmentLength = 2500;\nconst maxWords = 4;\nlet currentSegment = [];\nlet segmentStartTime = 0;\n\nfor (const word of words) {\n    if (currentSegment.length === 0) {\n        segmentStartTime = word.start;\n        currentSegment.push(word);\n    } else if (\n        word.start - segmentStartTime > segmentLength ||\n        currentSegment.length >= maxWords\n    ) {\n        const startMs = segmentStartTime;\n        const endMs = currentSegment[currentSegment.length - 1].end;\n        const startTime = formatTime(startMs);\n        const endTime = formatTime(endMs);\n        const text = currentSegment.map(w => w.text.toUpperCase()).join(' ');\n        \n        const color = colors[colorIndex % colors.length];\n        colorIndex++;\n        srtOutput += `${segmentIndex}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${text}\\n\\n`;\n        \n        segmentIndex++;\n        currentSegment = [word];\n        segmentStartTime = word.start;\n    } else {\n        currentSegment.push(word);\n    }\n}\n\nif (currentSegment.length > 0) {\n    const startMs = segmentStartTime;\n    const endMs = currentSegment[currentSegment.length - 1].end;\n    const startTime = formatTime(startMs);\n    const endTime = formatTime(endMs);\n    const text = currentSegment.map(w => w.text.toUpperCase()).join(' ');\n    \n    const color = colors[colorIndex % colors.length];\n    srtOutput += `${segmentIndex}\\n${startTime} --> ${endTime}\\n{\\\\c&H${color}&}${text}\\n\\n`;\n}\n\nfunction formatTime(milliseconds) {\n    const totalSeconds = Math.floor(milliseconds / 1000);\n    const hours = Math.floor(totalSeconds / 3600);\n    const minutes = Math.floor((totalSeconds % 3600) / 60);\n    const seconds = totalSeconds % 60;\n    const ms = milliseconds % 1000;\n    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;\n}\n\nreturn [{ json: { srt: srtOutput, text: transcript } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10096,
+        1392
+      ],
+      "id": "8f3ee6dc-2f93-4810-b16a-231dcc16eabd",
+      "name": "Generate SRT3"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=ffmpeg -y \\\n  -i /tmp/video_blurred_nosound.mp4 \\\n  -i /tmp/backgroundmusic.flac \\\n  -filter_complex \"\n    [1:a]volume=0.1,afade=in:st=0:d=1,afade=out:st=20:d=2[audio_bg]\n  \" \\\n  -vf \"subtitles=/tmp/subtitles_new.srt:force_style='FontName=Open Sans,FontSize=18,Bold=1,OutlineColour=&H000000,Outline=1,Shadow=0,MarginV=120,Spacing=-0.5,ScaleX=0.95,ScaleY=0.90'\" \\\n  -map 0:v \\\n  -map \"[audio_bg]\" \\\n  -c:v libx264 -c:a aac \\\n  -shortest \\\n  /tmp/video_final_with_subs.mp4"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        8832,
+        1888
+      ],
+      "id": "040fe85a-e981-44a3-b998-b68facf63ab6",
+      "name": "Add New Subtitles3"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_final_with_subs.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        9088,
+        1888
+      ],
+      "id": "9055fab8-cd8f-4b3e-8213-c4140072ace9",
+      "name": "Read Final Video3"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_input.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        10192,
+        944
+      ],
+      "id": "ed4c5215-82b4-43c1-8a7d-7ff2c83557b6",
+      "name": "Save Video3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "Mzc2N2FlNzRhYmQ0NGYyYmJhYTJiNmQ1MjQ4OTg3YzktMTY5MzM4MjU5MA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"video_inputs\": [\n    {\n      \"character\": {\n        \"type\": \"avatar\",\n        \"avatar_id\": \"August_Casual_Front2_public\",\n        \"avatar_style\": \"normal\",\n        \"offset\": {\n          \"x\": 0.0,\n          \"y\": 0.05\n        },\n        \"scale\": 1.5,\n        \"matting\": true\n      },\n      \"voice\": {\n        \"type\": \"text\",\n        \"input_text\": \"{{ $('Generate SRT3').item.json.text }}\",\n        \"voice_id\": \"d2f4f24783d04e22ab49ee8fdc3715e0\",\n        \"speed\": 1.5,\n        \"pitch\": 50,\n        \"emotion\": \"Excited\"\n      },\n      \"background\": {\n        \"type\": \"color\",\n        \"value\": \"#008000\"\n      }\n    }\n  ],\n  \"dimension\": {\n    \"width\": 720,\n    \"height\": 1280\n  },\n  \"caption\": false,\n  \"title\": \"Avatar Video\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9344,
+        1888
+      ],
+      "id": "481a33c2-915a-43ed-a43e-edf4cebeda8c",
+      "name": "Generate Avatar Video3"
+    },
+    {
+      "parameters": {
+        "url": "https://api.heygen.com/v1/video_status.get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "video_id",
+              "value": "={{ $json.data.video_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "Mzc2N2FlNzRhYmQ0NGYyYmJhYTJiNmQ1MjQ4OTg3YzktMTY5MzM4MjU5MA=="
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9856,
+        1888
+      ],
+      "id": "0c5b05b3-f9ba-4fb2-92b5-417675c8f673",
+      "name": "Get Avatar Status3"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.data.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10320,
+        1888
+      ],
+      "id": "80185a67-143b-4a73-ac2a-3fe22139db77",
+      "name": "Download Avatar3"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/heygen_avatar.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        10592,
+        1888
+      ],
+      "id": "81305e1b-c588-4f84-91b0-f5de28a701ec",
+      "name": "Save Avatar3"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=ffmpeg -y \\\n-i /tmp/video_final_with_subs.mp4 \\\n-i /tmp/heygen_avatar.mp4 \\\n-filter_complex \"[1:v]chromakey=color=green:similarity=0.09:blend=0.08,scale=600:-1,crop=500:500:50:0[avatar];[0:v][avatar]overlay=x=-30:y=main_h-overlay_h[video_with_avatar];[0:a][1:a]amix=inputs=2:duration=shortest[mixed_audio]\" \\\n-map \"[video_with_avatar]\" \\\n-map \"[mixed_audio]\" \\\n-c:v libx264 -c:a aac \\\n-shortest \\\n/tmp/video_with_avatar_final.mp4"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        9056,
+        2336
+      ],
+      "id": "46dcc3af-abbd-4c56-8a5f-25e3c045e77a",
+      "name": "Combine Videos3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e58a9617-5cee-4f43-9772-e65b22fdc858",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        10464,
+        496
+      ],
+      "id": "fa3fc1f0-9ab8-47fc-a653-00bdec2456bc",
+      "name": "If6"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.piapi.ai/api/v1/task",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "e96cfc81ab01e6f9e7ad1de9e95e50a85ca24e1a21d25061baf0e94bb9b0183a"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"Qubico/diffrhythm\",\n  \"task_type\": \"txt2audio-base\",\n  \"input\": {\n    \"lyrics\": \"\",\n    \"style_prompt\": \"ambient electronic background music, minimal techno, soft synthesizers, subtle beats, corporate presentation style, non-intrusive, professional atmosphere, no vocals, clean production, suitable for voice-over content, inspirational but not distracting, modern business vibe\",\n    \"style_audio\": \"\"\n  },\n  \"config\": {\n    \"webhook_config\": {\n      \"endpoint\": \"\",\n      \"secret\": \"\"\n    }\n  }\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9552,
+        496
+      ],
+      "id": "57888e15-1c8b-4425-b3d7-12472cd6e699",
+      "name": "Create Music3"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.piapi.ai/api/v1/task/{{ $json.data.task_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "e96cfc81ab01e6f9e7ad1de9e95e50a85ca24e1a21d25061baf0e94bb9b0183a"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10224,
+        496
+      ],
+      "id": "62fec6b7-0b27-497e-9180-fd051527ea5a",
+      "name": "Get Music3"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.data.output.audio_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8800,
+        944
+      ],
+      "id": "3f5b3c96-37a2-4140-8098-d7515500cfe5",
+      "name": "Load Music3"
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        9984,
+        496
+      ],
+      "id": "e530f1e2-b0fa-49b8-b535-aa4ddc1b7d60",
+      "name": "Wait Music3",
+      "webhookId": "cd18e466-8ab9-48e0-83b9-5d4a4953f148"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "new1"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        9152,
+        496
+      ],
+      "id": "2750358d-2548-4af3-a39d-f018415df287",
+      "name": "Get Video9"
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/backgroundmusic.flac",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        9120,
+        944
+      ],
+      "id": "5068d8f1-1712-4c90-afe1-86a7a64067d1",
+      "name": "Save Input Music3"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/backgroundmusic.flac",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        9440,
+        944
+      ],
+      "id": "c2d33530-aeac-4577-a105-bac53cab45a3",
+      "name": "Save Music3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        10080,
+        1888
+      ],
+      "id": "339f4140-fba4-4f0e-8052-8c2a2a03f9e0",
+      "name": "Check Status Video3"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        9408,
+        1408
+      ],
+      "id": "aec34a57-386c-4f7f-b075-ca0b616b9bd3",
+      "name": "Wait Transcription3",
+      "webhookId": "cf58c73e-c246-44a7-8804-a704b82706c3"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/video_with_avatar_final.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        9392,
+        2336
+      ],
+      "id": "54028356-0410-4e0c-b2c6-f32291a5ce75",
+      "name": "Save Final Video3"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/subtitles_new.srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        10640,
+        1392
+      ],
+      "id": "102078ae-d434-4c29-bea4-52983f27267f",
+      "name": "Save Sub3"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        10336,
+        1392
+      ],
+      "id": "b861255e-36c0-4867-b98e-3d141209a0ca",
+      "name": "Convert Sub3"
+    },
+    {
+      "parameters": {
+        "amount": 8,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        9584,
+        1888
+      ],
+      "id": "4c3abfd8-e3cb-4c74-a317-cb4c8bac0cd4",
+      "name": "Wait Avatar3",
+      "webhookId": "015f3202-4ef9-4547-b1fb-66953ebb78d8"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://amhfcqfsugtoxsgrqdfa.supabase.co/storage/v1/object/video/{{ $('Generate Unique ID').item.json.file_name }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaGZjcWZzdWd0b3hzZ3JxZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1OTU5NTcsImV4cCI6MjA2OTE3MTk1N30.MkHwbunUWGWFF9aGI0VeUZhFzm40oIPuMi-vqSPJ4n4"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9696,
+        2336
+      ],
+      "id": "61ae8f5a-c917-4459-952e-4041c37e1735",
+      "name": "Loading Supabase5",
+      "notes": "Политика доступа\nЗаменить 'n8' на свой bucket\n\nDROP POLICY \"Allow upload for anon key\" ON storage.objects;\nCREATE POLICY \"Allow upload for anon key\" ON storage.objects\nFOR INSERT\nWITH CHECK ((bucket_id = 'n8'::text) AND (auth.role() = 'anon'::text));"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Генерируем уникальное имя файла (12 символов)\nfunction generateUniqueId(length = 12) {\n  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';\n  let result = '';\n  for (let i = 0; i < length; i++) {\n    result += chars.charAt(Math.floor(Math.random() * chars.length));\n  }\n  return result;\n}\n\nconst uniqueId = generateUniqueId();\nconst fileName = `video_${uniqueId}.mp4`;\n\nreturn {\n  unique_id: uniqueId,\n  file_name: fileName,\n  timestamp: new Date().toISOString(),\n  status: 'pending'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8784,
+        2336
+      ],
+      "id": "743c1694-6110-4e9c-8245-a83053d09f25",
+      "name": "Generate Unique ID"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot7622962404:AAHrXvzIsTu3PXm7hPxD26lnS3Csbpb4Wzo/sendVideo",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "1929720358"
+            },
+            {
+              "name": "parse_mode",
+              "value": "HTML"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "reply_markup",
+              "value": "={\n \"inline_keyboard\": [\n   [\n     {\"text\": \"✅ Опубликовать\", \"callback_data\": \"publish_{{ $('Generate Unique ID').item.json.unique_id }}\"}\n   ],\n   [\n     {\"text\": \"🎬 Новое видео\", \"callback_data\": \"next_video_{{ $('Generate Unique ID').item.json.unique_id }}\"}\n   ],\n   [\n     {\"text\": \"🗑 Удалить\", \"callback_data\": \"delete_{{ $('Generate Unique ID').item.json.unique_id }}\"}\n   ]\n ]\n}"
+            },
+            {
+              "name": "supports_streaming",
+              "value": "true"
+            },
+            {
+              "name": "width",
+              "value": "1080"
+            },
+            {
+              "name": "height",
+              "value": "1920"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10448,
+        2336
+      ],
+      "id": "b16ade16-d9ba-4afd-a504-29648e889714",
+      "name": "Send Video to Telegram3"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "original_video_key",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Video9').item.json.original_video_key }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "processed_video_key",
+              "fieldValue": "={{ $('Loading Supabase5').item.json.body.Key }}"
+            },
+            {
+              "fieldId": "unique_id",
+              "fieldValue": "={{ $('Generate Unique ID').item.json.unique_id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        10656,
+        2336
+      ],
+      "id": "a1631319-cf18-4c32-b858-0478ddaf1dd2",
+      "name": "Get Video10"
+    },
+    {
+      "parameters": {
+        "chatId": "=1929720358",
+        "text": "🎬 Видео генерируется, это займёт ≈15 мин. Пожалуйста, дождитесь загрузки.\n\n⚠️ Если видео не загрузилось, попробуйте снова. Если ошибка повторяется — напишите в поддержку.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        8752,
+        496
+      ],
+      "id": "40165dfc-31f0-494b-9798-1dd0bbdfc925",
+      "name": "Notice3",
+      "webhookId": "521c5366-229f-4be1-beb9-6896d8fd45ec"
+    },
+    {
+      "parameters": {
+        "content": "# Scraping Module  🔄",
+        "height": 1168,
+        "width": 2112,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2368,
+        64
+      ],
+      "typeVersion": 1,
+      "id": "0d911b35-239c-4f02-9f4a-85af0531a11e",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# Autoposting Module  📩",
+        "height": 1840,
+        "width": 3440,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "9511ca1e-8a70-4bed-94b0-a4420d679123",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "# Moderation Module ✅ ",
+        "height": 1264,
+        "width": 1856
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4048,
+        16
+      ],
+      "typeVersion": 1,
+      "id": "420a8d46-c321-4ac1-8c1d-c97984d66037",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "# Next Video Module 🎬",
+        "height": 2432,
+        "width": 3328,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        8160,
+        368
+      ],
+      "typeVersion": 1,
+      "id": "894aac86-92e1-43d9-a889-4ba257fa9c57",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "# Next Video Module 🎬",
+        "height": 2432,
+        "width": 3440,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3776,
+        2224
+      ],
+      "typeVersion": 1,
+      "id": "4e263c34-625f-4d68-acb7-cb2b4f15e0b9",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "# Video Processing Module 📀",
+        "height": 2432,
+        "width": 2704,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2800,
+        2256
+      ],
+      "typeVersion": 1,
+      "id": "6e9cb5dc-df6a-42d2-8cff-6ee845c5f2bc",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "# Video Processing Module 📀",
+        "height": 2432,
+        "width": 2704,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        2080
+      ],
+      "typeVersion": 1,
+      "id": "786c1b9c-fa4d-4cf8-9f13-03b1ec059973",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "unique_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Video2').item.json.unique_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "sent"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1664,
+        896
+      ],
+      "id": "0996964e-7644-4a9e-b34e-ea81ae6cb579",
+      "name": "Update Status"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Video Supabase1": {
+      "main": [
+        [
+          {
+            "node": "Get Binary Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Binary Video1": {
+      "main": [
+        [
+          {
+            "node": "Send Video to Telegram1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Input Video": {
+      "main": [
+        [
+          {
+            "node": "Save Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Video + Extract Audio": {
+      "main": [
+        [
+          {
+            "node": "Read Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Audio": {
+      "main": [
+        [
+          {
+            "node": "Upload Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Audio": {
+      "main": [
+        [
+          {
+            "node": "Start Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Transcription": {
+      "main": [
+        [
+          {
+            "node": "Wait Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transcription": {
+      "main": [
+        [
+          {
+            "node": "Check Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status": {
+      "main": [
+        [
+          {
+            "node": "Generate SRT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate SRT": {
+      "main": [
+        [
+          {
+            "node": "Convert Sub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add New Subtitles": {
+      "main": [
+        [
+          {
+            "node": "Read Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Final Video": {
+      "main": [
+        [
+          {
+            "node": "Generate Avatar Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Video": {
+      "main": [
+        [
+          {
+            "node": "Process Video + Extract Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Avatar Video": {
+      "main": [
+        [
+          {
+            "node": "Wait Avatar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Avatar Status": {
+      "main": [
+        [
+          {
+            "node": "Check Status Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Avatar": {
+      "main": [
+        [
+          {
+            "node": "Save Avatar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Avatar": {
+      "main": [
+        [
+          {
+            "node": "Generate Unique ID1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Videos": {
+      "main": [
+        [
+          {
+            "node": "Save Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Load Music",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Music": {
+      "main": [
+        [
+          {
+            "node": "Wait Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Music": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Music": {
+      "main": [
+        [
+          {
+            "node": "Get Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video": {
+      "main": [
+        [
+          {
+            "node": "Create Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Music": {
+      "main": [
+        [
+          {
+            "node": "Save Input Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Input Music": {
+      "main": [
+        [
+          {
+            "node": "Save Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Music": {
+      "main": [
+        [
+          {
+            "node": "Get Video Supabase3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status Video": {
+      "main": [
+        [
+          {
+            "node": "Download Avatar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Avatar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Transcription": {
+      "main": [
+        [
+          {
+            "node": "Get Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Sub": {
+      "main": [
+        [
+          {
+            "node": "Add New Subtitles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Sub": {
+      "main": [
+        [
+          {
+            "node": "Save Sub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Avatar": {
+      "main": [
+        [
+          {
+            "node": "Get Avatar Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Final Video": {
+      "main": [
+        [
+          {
+            "node": "Loading Supabase1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Unique ID1": {
+      "main": [
+        [
+          {
+            "node": "Combine Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loading Supabase1": {
+      "main": [
+        [
+          {
+            "node": "Get Video Supabase1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Video to Telegram1": {
+      "main": [
+        [
+          {
+            "node": "Get Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Video3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notice1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete a chat message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Video4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notice3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video3": {
+      "main": [
+        [
+          {
+            "node": "Edit Keyboard2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video4": {
+      "main": [
+        [
+          {
+            "node": "Edit Keyboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video2": {
+      "main": [
+        [
+          {
+            "node": "Get Link Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Post": {
+      "main": [
+        [
+          {
+            "node": "Get Video2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Supabase2": {
+      "main": [
+        [
+          {
+            "node": "Send Inst",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send TikTok",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send YouTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Inst": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Success  Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Eror  Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Success  Message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Eror  Message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send TikTok": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Supabase3": {
+      "main": [
+        [
+          {
+            "node": "Save Input Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Link Video": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Create Title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notice": {
+      "main": [
+        [
+          {
+            "node": "Get Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Title": {
+      "main": [
+        [
+          {
+            "node": "Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Success  Message2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Eror  Message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send YouTube": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Supabase": {
+      "main": [
+        [
+          {
+            "node": "Get Binary Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Binary Video": {
+      "main": [
+        [
+          {
+            "node": "Send Video to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Input Video1": {
+      "main": [
+        [
+          {
+            "node": "Save Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Video + Extract Audio1": {
+      "main": [
+        [
+          {
+            "node": "Read Audio1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Audio1": {
+      "main": [
+        [
+          {
+            "node": "Upload Audio1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Audio1": {
+      "main": [
+        [
+          {
+            "node": "Start Transcription1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Transcription1": {
+      "main": [
+        [
+          {
+            "node": "Wait Transcription1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transcription1": {
+      "main": [
+        [
+          {
+            "node": "Check Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status1": {
+      "main": [
+        [
+          {
+            "node": "Generate SRT1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Transcription1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate SRT1": {
+      "main": [
+        [
+          {
+            "node": "Convert Sub1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add New Subtitles1": {
+      "main": [
+        [
+          {
+            "node": "Read Final Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Final Video1": {
+      "main": [
+        [
+          {
+            "node": "Generate Avatar Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Video1": {
+      "main": [
+        [
+          {
+            "node": "Process Video + Extract Audio1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Avatar Video1": {
+      "main": [
+        [
+          {
+            "node": "Wait Avatar1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Avatar Status1": {
+      "main": [
+        [
+          {
+            "node": "Check Status Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Avatar1": {
+      "main": [
+        [
+          {
+            "node": "Save Avatar1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Avatar1": {
+      "main": [
+        [
+          {
+            "node": "Generate Unique ID2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Videos1": {
+      "main": [
+        [
+          {
+            "node": "Save Final Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If4": {
+      "main": [
+        [
+          {
+            "node": "Load Music1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Music1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Music1": {
+      "main": [
+        [
+          {
+            "node": "Wait Music1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Music1": {
+      "main": [
+        [
+          {
+            "node": "If4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Music1": {
+      "main": [
+        [
+          {
+            "node": "Save Input Music1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Music1": {
+      "main": [
+        [
+          {
+            "node": "Get Music1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video5": {
+      "main": [
+        [
+          {
+            "node": "Create Music1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Input Music1": {
+      "main": [
+        [
+          {
+            "node": "Save Music1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Music1": {
+      "main": [
+        [
+          {
+            "node": "Get Video Supabase4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status Video1": {
+      "main": [
+        [
+          {
+            "node": "Download Avatar1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Avatar1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Transcription1": {
+      "main": [
+        [
+          {
+            "node": "Get Transcription1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Final Video1": {
+      "main": [
+        [
+          {
+            "node": "Loading Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Sub1": {
+      "main": [
+        [
+          {
+            "node": "Add New Subtitles1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Sub1": {
+      "main": [
+        [
+          {
+            "node": "Save Sub1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Avatar1": {
+      "main": [
+        [
+          {
+            "node": "Get Avatar Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loading Supabase": {
+      "main": [
+        [
+          {
+            "node": "Get Video Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Unique ID2": {
+      "main": [
+        [
+          {
+            "node": "Combine Videos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Video to Telegram": {
+      "main": [
+        [
+          {
+            "node": "Get Video6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Supabase4": {
+      "main": [
+        [
+          {
+            "node": "Save Input Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notice1": {
+      "main": [
+        [
+          {
+            "node": "Get Video5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inst Scraper1": {
+      "main": [
+        [
+          {
+            "node": "Split Videos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Database1": {
+      "main": [
+        [
+          {
+            "node": "Split Videos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loading Supabase3": {
+      "main": [
+        [
+          {
+            "node": "Add Database1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Videos1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Generate Unique ID3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Eror  Message4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          {
+            "node": "Loading Supabase3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Unique ID3": {
+      "main": [
+        [
+          {
+            "node": "Download Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scraper Inst": {
+      "main": [
+        [
+          {
+            "node": "Inst Scraper1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scraper TikTok": {
+      "main": [
+        [
+          {
+            "node": "TikTok Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TikTok Scraper": {
+      "main": [
+        [
+          {
+            "node": "Download TikTok Sub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download TikTok Sub": {
+      "main": [
+        [
+          {
+            "node": "Add Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Supabase5": {
+      "main": [
+        [
+          {
+            "node": "Get Binary Video2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Binary Video2": {
+      "main": [
+        [
+          {
+            "node": "Send Video to Telegram2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Input Video2": {
+      "main": [
+        [
+          {
+            "node": "Save Video2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Video + Extract Audio2": {
+      "main": [
+        [
+          {
+            "node": "Read Audio2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Audio2": {
+      "main": [
+        [
+          {
+            "node": "Upload Audio2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Audio2": {
+      "main": [
+        [
+          {
+            "node": "Start Transcription2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Transcription2": {
+      "main": [
+        [
+          {
+            "node": "Wait Transcription2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transcription2": {
+      "main": [
+        [
+          {
+            "node": "Check Status2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status2": {
+      "main": [
+        [
+          {
+            "node": "Generate SRT2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Transcription2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate SRT2": {
+      "main": [
+        [
+          {
+            "node": "Convert Sub2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add New Subtitles2": {
+      "main": [
+        [
+          {
+            "node": "Read Final Video2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Final Video2": {
+      "main": [
+        [
+          {
+            "node": "Generate Avatar Video2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Video2": {
+      "main": [
+        [
+          {
+            "node": "Process Video + Extract Audio2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Avatar Video2": {
+      "main": [
+        [
+          {
+            "node": "Wait Avatar2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Avatar Status2": {
+      "main": [
+        [
+          {
+            "node": "Check Status Video2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Avatar2": {
+      "main": [
+        [
+          {
+            "node": "Save Avatar2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Avatar2": {
+      "main": [
+        [
+          {
+            "node": "Generate Unique ID4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Videos2": {
+      "main": [
+        [
+          {
+            "node": "Save Final Video2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If5": {
+      "main": [
+        [
+          {
+            "node": "Load Music2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Music2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Music2": {
+      "main": [
+        [
+          {
+            "node": "Wait Music2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Music2": {
+      "main": [
+        [
+          {
+            "node": "If5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Music2": {
+      "main": [
+        [
+          {
+            "node": "Save Input Music2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Music2": {
+      "main": [
+        [
+          {
+            "node": "Get Music2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video7": {
+      "main": [
+        [
+          {
+            "node": "Create Music2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Input Music2": {
+      "main": [
+        [
+          {
+            "node": "Save Music2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Music2": {
+      "main": [
+        [
+          {
+            "node": "Download TikTok Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status Video2": {
+      "main": [
+        [
+          {
+            "node": "Download Avatar2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Avatar2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Transcription2": {
+      "main": [
+        [
+          {
+            "node": "Get Transcription2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Final Video2": {
+      "main": [
+        [
+          {
+            "node": "Loading Supabase4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Sub2": {
+      "main": [
+        [
+          {
+            "node": "Add New Subtitles2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Sub2": {
+      "main": [
+        [
+          {
+            "node": "Save Sub2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Avatar2": {
+      "main": [
+        [
+          {
+            "node": "Get Avatar Status2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loading Supabase4": {
+      "main": [
+        [
+          {
+            "node": "Get Video Supabase5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Unique ID4": {
+      "main": [
+        [
+          {
+            "node": "Combine Videos2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Video to Telegram2": {
+      "main": [
+        [
+          {
+            "node": "Get Video8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notice2": {
+      "main": [
+        [
+          {
+            "node": "Get Video7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download TikTok Video": {
+      "main": [
+        [
+          {
+            "node": "Save Input Video2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Moderation Inst": {
+      "main": [
+        [
+          {
+            "node": "Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Moderation TikTok": {
+      "main": [
+        [
+          {
+            "node": "Notice2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download TikTok Video1": {
+      "main": [
+        [
+          {
+            "node": "Save Input Video3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Supabase6": {
+      "main": [
+        [
+          {
+            "node": "Get Binary Video3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Binary Video3": {
+      "main": [
+        [
+          {
+            "node": "Send Video to Telegram3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Input Video3": {
+      "main": [
+        [
+          {
+            "node": "Save Video3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Video + Extract Audio3": {
+      "main": [
+        [
+          {
+            "node": "Read Audio3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Audio3": {
+      "main": [
+        [
+          {
+            "node": "Upload Audio3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Audio3": {
+      "main": [
+        [
+          {
+            "node": "Start Transcription3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Transcription3": {
+      "main": [
+        [
+          {
+            "node": "Wait Transcription3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transcription3": {
+      "main": [
+        [
+          {
+            "node": "Check Status3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status3": {
+      "main": [
+        [
+          {
+            "node": "Generate SRT3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Transcription3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate SRT3": {
+      "main": [
+        [
+          {
+            "node": "Convert Sub3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add New Subtitles3": {
+      "main": [
+        [
+          {
+            "node": "Read Final Video3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Final Video3": {
+      "main": [
+        [
+          {
+            "node": "Generate Avatar Video3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Video3": {
+      "main": [
+        [
+          {
+            "node": "Process Video + Extract Audio3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Avatar Video3": {
+      "main": [
+        [
+          {
+            "node": "Wait Avatar3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Avatar Status3": {
+      "main": [
+        [
+          {
+            "node": "Check Status Video3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Avatar3": {
+      "main": [
+        [
+          {
+            "node": "Save Avatar3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Avatar3": {
+      "main": [
+        [
+          {
+            "node": "Generate Unique ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Videos3": {
+      "main": [
+        [
+          {
+            "node": "Save Final Video3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If6": {
+      "main": [
+        [
+          {
+            "node": "Load Music3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Music3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Music3": {
+      "main": [
+        [
+          {
+            "node": "Wait Music3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Music3": {
+      "main": [
+        [
+          {
+            "node": "If6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Music3": {
+      "main": [
+        [
+          {
+            "node": "Save Input Music3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Music3": {
+      "main": [
+        [
+          {
+            "node": "Get Music3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video9": {
+      "main": [
+        [
+          {
+            "node": "Create Music3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Input Music3": {
+      "main": [
+        [
+          {
+            "node": "Save Music3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Music3": {
+      "main": [
+        [
+          {
+            "node": "Download TikTok Video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status Video3": {
+      "main": [
+        [
+          {
+            "node": "Download Avatar3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Avatar3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Transcription3": {
+      "main": [
+        [
+          {
+            "node": "Get Transcription3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Final Video3": {
+      "main": [
+        [
+          {
+            "node": "Loading Supabase5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Sub3": {
+      "main": [
+        [
+          {
+            "node": "Add New Subtitles3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Sub3": {
+      "main": [
+        [
+          {
+            "node": "Save Sub3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Avatar3": {
+      "main": [
+        [
+          {
+            "node": "Get Avatar Status3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loading Supabase5": {
+      "main": [
+        [
+          {
+            "node": "Get Video Supabase6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Unique ID": {
+      "main": [
+        [
+          {
+            "node": "Combine Videos3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Video to Telegram3": {
+      "main": [
+        [
+          {
+            "node": "Get Video10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notice3": {
+      "main": [
+        [
+          {
+            "node": "Get Video9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status": {
+      "main": [
+        [
+          {
+            "node": "Get Video Supabase2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7b4c16d5-e8e7-4361-9d1d-8e32a2333be3",
+  "meta": {
+    "instanceId": "9e467d662ee9872a6d36d0460113c677d048af23d9f00ca0ac1b169a4ba69b8a"
+  },
+  "id": "ZPa1mZH1ONAHCZhU",
+  "tags": []
+}
