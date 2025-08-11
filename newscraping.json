@@ -1,0 +1,639 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": ""
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n    \"username\": [\"excelbranding\"],\n    \"resultsLimit\": 20,\n    \"sort\": \"newest\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -6140,
+        -1920
+      ],
+      "id": "4df85e30-4806-4259-a42d-4b9565defbf8",
+      "name": "Instagram Scraper"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =================================\n// НАСТРОЙКА КАЧЕСТВА КОНТЕНТА INSTAGRAM\n// =================================\n// Измените значение от 1 до 10:\n// 10 = Только абсолютные хиты (2-3 видео/неделю)\n// 9 = Топовые хиты (3-4 видео/неделю)\n// 8 = Отличное качество (6-8 видео/неделю) ⭐ РЕКОМЕНДУЕТСЯ\n// 7 = Хорошее качество (8-10 видео/неделю)\n// 6 = Неплохое качество (10-12 видео/неделю)\n// 5 = Среднее качество (12-15 видео/неделю)\n// 4 = Ниже среднего (15-18 видео/неделю)\n// 3 = Слабое качество (18-20 видео/неделю)\n// 1-2 = Любое качество (~20 видео/неделю)\nconst QUALITY_LEVEL = 5; // ⭐ Оптимальное значение для баланса качества и количества\n\n// =================================\n// Пороговые значения для фильтрации\n// =================================\nconst qualitySettings = {\n  10: { threshold: 86, min: 2, max: 3 },\n  9:  { threshold: 68, min: 3, max: 4 },\n  8:  { threshold: 65, min: 6, max: 8 },\n  7:  { threshold: 60, min: 8, max: 10 },\n  6:  { threshold: 50, min: 10, max: 12 },\n  5:  { threshold: 40, min: 12, max: 15 },\n  4:  { threshold: 30, min: 15, max: 18 },\n  3:  { threshold: 20, min: 18, max: 20 },\n  2:  { threshold: 10, min: 20, max: 20 },\n  1:  { threshold: 5,  min: 20, max: 20 }\n};\n\nconst { threshold, min: MIN_VIDEOS, max: MAX_VIDEOS } = qualitySettings[QUALITY_LEVEL] || { threshold: 65, min: 5, max: 10 };\n\n// =================================\n// Функция расчёта Instagram Score\n// =================================\nfunction calculateInstagramScore(item) {\n  const views = item.videoViewCount || 0;\n  const likes = item.likesCount || 0;\n  const comments = item.commentsCount || 0;\n  \n  if (views === 0) return 0;\n  \n  // Engagement Rate (35%)\n  const engagement = likes + (comments * 2);\n  const engagementRate = (engagement / views) * 100;\n  let engagementScore = 0;\n  if (engagementRate >= 15) engagementScore = 35;\n  else if (engagementRate >= 10) engagementScore = 30 + (engagementRate - 10) * 1;\n  else if (engagementRate >= 5) engagementScore = 20 + (engagementRate - 5) * 2;\n  else if (engagementRate >= 2) engagementScore = 10 + (engagementRate - 2) * 3.33;\n  else engagementScore = engagementRate * 5;\n  \n  // View Velocity (25%)\n  const hoursOld = item.timestamp ? \n    (Date.now() - new Date(item.timestamp).getTime()) / (1000 * 60 * 60) : 24;\n  const velocity = views / Math.max(hoursOld, 1);\n  let velocityScore = 0;\n  if (velocity >= 100000) velocityScore = 25;\n  else if (velocity >= 50000) velocityScore = 20 + (velocity - 50000) / 10000;\n  else if (velocity >= 10000) velocityScore = 15 + (velocity - 10000) / 8000;\n  else if (velocity >= 1000) velocityScore = 8 + (velocity - 1000) / 1285;\n  else velocityScore = velocity / 125;\n  \n  // Popularity (25%)\n  let popularityScore = 0;\n  if (views >= 1000000) popularityScore = 25;\n  else if (views >= 500000) popularityScore = 22 + (views - 500000) / 166666;\n  else if (views >= 100000) popularityScore = 18 + (views - 100000) / 100000;\n  else if (views >= 50000) popularityScore = 15 + (views - 50000) / 16666;\n  else if (views >= 10000) popularityScore = 10 + (views - 10000) / 8000;\n  else if (views >= 1000) popularityScore = 5 + (views - 1000) / 1800;\n  else popularityScore = views / 200;\n  \n  // Content Quality Bonus (15%)\n  let contentScore = 5;\n  if (item.hashtags && item.hashtags.length > 0) {\n    if (item.hashtags.length >= 5) contentScore += 4;\n    else if (item.hashtags.length >= 3) contentScore += 3;\n    else contentScore += 2;\n  }\n  if (item.musicInfo && !item.musicInfo.uses_original_audio) contentScore += 3;\n  if (item.text && item.text.length > 50) contentScore += Math.min(3, item.text.length / 50);\n  contentScore = Math.min(contentScore, 15);\n  \n  const totalScore = engagementScore + velocityScore + popularityScore + contentScore;\n  return Math.round(Math.min(totalScore, 100));\n}\n\n// =================================\n// Обработка видео\n// =================================\nconst allItems = $input.all().map(item => item.json);\n\nconst processedItems = allItems.map(item => ({\n  ...item,\n  content_score: calculateInstagramScore(item)\n}));\n\n// Фильтрация по порогу\nlet selectedItems = processedItems.filter(item => item.content_score > threshold);\n\n// Если не хватает до минимума — добираем лучшие по скору\nif (selectedItems.length < MIN_VIDEOS) {\n  console.log(`\\n⚠️ Мало видео выше порога (${selectedItems.length}/${MIN_VIDEOS}). Добираем.`);\n  const extra = processedItems\n    .filter(item => !selectedItems.includes(item))\n    .sort((a, b) => b.content_score - a.content_score)\n    .slice(0, MIN_VIDEOS - selectedItems.length);\n  selectedItems = [...selectedItems, ...extra];\n}\n\n// Ограничиваем максимум\nselectedItems = selectedItems\n  .sort((a, b) => b.content_score - a.content_score)\n  .slice(0, MAX_VIDEOS);\n\nconst finalItems = selectedItems;\n\n// =================================\n// СТАТИСТИКА\n// =================================\nconsole.log('='.repeat(50));\nconsole.log(`📊 СТАТИСТИКА ОБРАБОТКИ`);\nconsole.log('='.repeat(50));\nconsole.log(`✅ Обработано видео: ${allItems.length}`);\nconsole.log(`✅ Отобрано для загрузки: ${finalItems.length}`);\nconsole.log(`✅ Уровень качества: ${QUALITY_LEVEL}/10`);\nconsole.log(`✅ Порог качества: ${threshold} баллов`);\n\nconst scoreRanges = {\n  '80-100': 0,\n  '60-79': 0,\n  '40-59': 0,\n  '20-39': 0,\n  '0-19': 0\n};\n\nprocessedItems.forEach(item => {\n  if (item.content_score >= 80) scoreRanges['80-100']++;\n  else if (item.content_score >= 60) scoreRanges['60-79']++;\n  else if (item.content_score >= 40) scoreRanges['40-59']++;\n  else if (item.content_score >= 20) scoreRanges['20-39']++;\n  else scoreRanges['0-19']++;\n});\n\nconsole.log('\\n📈 Распределение видео по скорам:');\nObject.entries(scoreRanges).forEach(([range, count]) => {\n  const percentage = ((count / allItems.length) * 100).toFixed(1);\n  console.log(`   ${range}: ${count} видео (${percentage}%)`);\n});\n\nconsole.log('\\n🏆 Топ-5 видео по скору:');\nprocessedItems\n  .sort((a, b) => b.content_score - a.content_score)\n  .slice(0, 5)\n  .forEach((item, index) => {\n    const status = item.content_score > threshold ? '✅' : '❌';\n    const views = item.videoViewCount ? item.videoViewCount.toLocaleString() : '0';\n    const likes = item.likesCount ? item.likesCount.toLocaleString() : '0';\n    console.log(`${index + 1}. ${status} Score: ${item.content_score} | Views: ${views} | Likes: ${likes}`);\n  });\n\nif (finalItems.length === 0) {\n  console.log('\\n⚠️ ВНИМАНИЕ: Не найдено видео соответствующего качества!');\n  throw new Error('Нет видео для загрузки');\n}\n\nreturn finalItems.map(item => ({ json: item }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5780,
+        -1920
+      ],
+      "id": "b8f8cbd0-0ca5-4bab-842c-f5f5b51af5dd",
+      "name": "Instagram Virality Filter"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -4500,
+        -1900
+      ],
+      "id": "0f214578-9582-493b-bd5d-16724d57a93b",
+      "name": "Split Instagram Videos",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Split Instagram Videos').item.json.videoUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3900,
+        -1900
+      ],
+      "id": "98fcbd03-47a8-4566-b03c-3443f14e5ceb",
+      "name": "Download Instagram Video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": ""
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3600,
+        -1900
+      ],
+      "id": "a76d8666-57bc-4ca2-b6a5-acbd4a6bce8a",
+      "name": "Upload Instagram Video"
+    },
+    {
+      "parameters": {
+        "tableId": "videos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ $('Split Instagram Videos').item.json.latestComments[0].timestamp }}"
+            },
+            {
+              "fieldId": "caption",
+              "fieldValue": "={{ $('Split Instagram Videos').item.json.caption }}"
+            },
+            {
+              "fieldId": "likes_count",
+              "fieldValue": "={{ $json.likesCount || $json.like_count || 0 }}"
+            },
+            {
+              "fieldId": "video_view_count",
+              "fieldValue": "={{ $json.videoViewCount || $json.video_views || $json.views || 0 }}"
+            },
+            {
+              "fieldId": "source",
+              "fieldValue": "excelbranding"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "new"
+            },
+            {
+              "fieldId": "original_video_key",
+              "fieldValue": "={{ $json.body.Key }}"
+            },
+            {
+              "fieldId": "video_url",
+              "fieldValue": "={{ $('Duplicate Filter1').item.json.videoUrl }}"
+            },
+            {
+              "fieldId": "post_url",
+              "fieldValue": "={{ $('Duplicate Filter1').item.json.videoUrl }}"
+            },
+            {
+              "fieldId": "short_code",
+              "fieldValue": "={{ $('Instagram Virality Filter').item.json.shortCode }}"
+            },
+            {
+              "fieldId": "instagram_id",
+              "fieldValue": "={{ $('Instagram Virality Filter').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3300,
+        -1900
+      ],
+      "id": "a24a740b-3417-4ca1-bb5f-f78cce3b1c81",
+      "name": "Add Instagram to DB",
+      "credentials": {
+        "supabaseApi": {
+          "id": "G91LxvStJeEUrkzl",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Генерируем уникальное имя файла для Instagram\nfunction generateUniqueId(length = 12) {\n  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';\n  let result = '';\n  for (let i = 0; i < length; i++) {\n    result += chars.charAt(Math.floor(Math.random() * chars.length));\n  }\n  return result;\n}\n\nconst uniqueId = generateUniqueId();\nconst fileName = `original_video_${uniqueId}.mp4`;\n\nreturn {\n  unique_id: uniqueId,\n  file_name: fileName,\n  timestamp: new Date().toISOString(),\n  status: 'pending'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4200,
+        -1900
+      ],
+      "id": "9714ece3-397b-4bc1-9bd8-1292f5c74555",
+      "name": "Generate Unique ID5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": ""
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n    \"excludePinnedPosts\": true,\n    \"profileScrapeSections\": [\"videos\"],\n    \"profileSorting\": \"latest\",\n    \"profiles\": [\"nikko.montanez\"],\n    \"proxyCountryCode\": \"None\",\n    \"resultsPerPage\":20,\n    \"scrapeRelatedVideos\": false,\n    \"shouldDownloadAvatars\": false,\n    \"shouldDownloadCovers\": false,\n    \"shouldDownloadMusicCovers\": false,\n    \"shouldDownloadSlideshowImages\": false,\n    \"shouldDownloadSubtitles\": true,\n    \"shouldDownloadVideos\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -6120,
+        -2400
+      ],
+      "id": "1c16992a-f86d-4a76-a8bb-7ef974d406dc",
+      "name": "TikTok Scraper"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =================================\n// НАСТРОЙКА КАЧЕСТВА КОНТЕНТА\n// =================================\n// Измените значение от 1 до 10:\n// 10 = Только хиты (1-3 видео/неделю)\n// 8 = Отличное качество (5-8 видео/неделю) ⭐ РЕКОМЕНДУЕТСЯ\n// 6 = Хорошее качество (8-12 видео/неделю)\n// 4 = Среднее качество (12-15 видео/неделю)\n// 1 = Любое качество (15+ видео/неделю)\n\nconst QUALITY_LEVEL = 5; // ⭐ Оптимальное значение для баланса качества и количества\n\n// =================================\n// НЕ ИЗМЕНЯЙТЕ КОД НИЖЕ\n// =================================\n\nconst qualitySettings = {\n10: 50, 9: 47, 8: 44, 7: 41, 6: 38,\n5: 35, 4: 32, 3: 29, 2: 26, 1: 23\n};\nconst threshold = qualitySettings[QUALITY_LEVEL] || 41;\n\nfunction calculateContentScore(item) {\nconst views = item.playCount || 0;\nconst likes = item.diggCount || 0;\nconst comments = item.commentCount || 0;\nconst shares = item.shareCount || 0;\nconst saves = item.collectCount || 0;\n\nif (views === 0) return 0;\n\nconst engagement = likes + comments + shares + saves;\nconst engagementRate = (engagement / views) * 100;\nconst engagementScore = Math.min(engagementRate * 2, 40);\n\nconst hoursOld = (Date.now() - new Date(item.createTimeISO).getTime()) / (1000 * 60 * 60);\nconst velocity = hoursOld > 0 ? views / Math.max(hoursOld, 1) : 0;\nconst velocityScore = Math.min(Math.log10(velocity + 1) * 6, 30);\n\nconst popularityScore = Math.min(Math.log10(views + 1) * 2.5, 20);\n\nconst hasHashtags = item.text && item.text.includes('#') ? 3 : 0;\nconst hasMusic = item.musicMeta ? 2 : 0;\nconst contentScore = 5 + hasHashtags + hasMusic;\n\nconst totalScore = engagementScore + velocityScore + popularityScore + contentScore;\nreturn Math.round(Math.min(totalScore, 100));\n}\n\nconst allItems = $input.all().map(item => item.json);\nconst processedItems = allItems.map(item => ({\n...item,\ncontent_score: calculateContentScore(item)\n}));\nconst selectedItems = processedItems.filter(item => item.content_score > threshold);\nconst finalItems = selectedItems.sort((a, b) => b.content_score - a.content_score);\n\nconsole.log(`✅ Обработано: ${allItems.length} видео`);\nconsole.log(`✅ Отобрано для загрузки: ${finalItems.length} видео`);\nconsole.log(`✅ Уровень качества: ${QUALITY_LEVEL}/10`);\n\nif (finalItems.length === 0) {\n throw new Error('⚠️ Не найдено видео соответствующего качества. Попробуйте снизить QUALITY_LEVEL');\n}\n\nreturn finalItems.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5720,
+        -2400
+      ],
+      "id": "e4879389-a59f-4b9a-83bb-e1e9909780b9",
+      "name": "Filter & Score Videos"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -6580,
+        -2400
+      ],
+      "id": "c496d2a5-b67a-449b-aecf-5785d5746a8b",
+      "name": "Weekly Scraper1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -5040,
+        -2380
+      ],
+      "id": "dec27cec-180e-4a13-8931-f20551881c37",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -5320,
+        -2280
+      ],
+      "id": "1d9f7fb0-a744-474a-81a4-ab86d3233a44",
+      "name": "Get Links",
+      "credentials": {
+        "supabaseApi": {
+          "id": "G91LxvStJeEUrkzl",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Код для Code ноды в n8n для фильтрации дубликатов\n\n// Получаем все входные данные\nconst allItems = $input.all();\n\n// Разделяем данные по типу источника\nconst newVideos = [];\nconst existingVideos = [];\n\n// Определяем тип данных по наличию характерных полей\nfor (const item of allItems) {\n  const data = item.json;\n  \n  // Если есть webVideoUrl - это новое видео от Filter & Score Videos\n  if (data.webVideoUrl !== undefined) {\n    newVideos.push(item);\n  }\n  // Если есть video_url или post_url - это из базы данных Supabase\n  else if (data.video_url !== undefined || data.post_url !== undefined) {\n    existingVideos.push(item);\n  }\n  // Если не можем определить, смотрим на другие поля\n  else if (data.authorMeta && data.musicMeta) {\n    // Это похоже на структуру TikTok видео\n    newVideos.push(item);\n  } else if (data.caption && data.source) {\n    // Это похоже на структуру из БД\n    existingVideos.push(item);\n  }\n}\n\nconsole.log(`Получено новых видео: ${newVideos.length}`);\nconsole.log(`Видео в БД: ${existingVideos.length}`);\n\n// Если нет новых видео для фильтрации\nif (newVideos.length === 0) {\n  console.log('Нет новых видео для обработки');\n  return [];\n}\n\n// Создаем Set с существующими URL и ID для быстрого поиска\nconst existingUrls = new Set();\nconst existingIds = new Set();\n\n// Обрабатываем данные из Supabase\nfor (const item of existingVideos) {\n  const video = item.json;\n  \n  // Добавляем прямой ID\n  if (video.id) {\n    existingIds.add(String(video.id));\n  }\n  \n  // Извлекаем ID видео из URL если это прямая ссылка на файл\n  if (video.video_url) {\n    existingUrls.add(video.video_url);\n    \n    // Пытаемся извлечь ID из URL\n    const match = video.video_url.match(/video-.*-(\\d+)\\.mp4/);\n    if (match) {\n      existingIds.add(match[1]); // Добавляем ID видео\n    }\n  }\n  \n  if (video.post_url) {\n    existingUrls.add(video.post_url);\n    \n    const match = video.post_url.match(/video-.*-(\\d+)\\.mp4/);\n    if (match) {\n      existingIds.add(match[1]);\n    }\n  }\n}\n\nconsole.log(`Уникальных ID в БД: ${existingIds.size}`);\nconsole.log(`URL в БД: ${existingUrls.size}`);\n\n// Фильтруем новые видео\nconst filteredVideos = [];\nconst duplicatesFound = [];\n\nfor (const item of newVideos) {\n  const video = item.json;\n  let isDuplicate = false;\n  let duplicateReason = '';\n  \n  // Проверяем по ID видео\n  if (video.id && existingIds.has(String(video.id))) {\n    isDuplicate = true;\n    duplicateReason = `ID ${video.id} уже в БД`;\n  }\n  \n  // Проверяем по webVideoUrl\n  if (!isDuplicate && video.webVideoUrl) {\n    // Проверяем полный URL\n    if (existingUrls.has(video.webVideoUrl)) {\n      isDuplicate = true;\n      duplicateReason = 'URL уже существует';\n    }\n    \n    // Извлекаем ID из URL TikTok и проверяем\n    const tiktokIdMatch = video.webVideoUrl.match(/video\\/(\\d+)/);\n    if (tiktokIdMatch && existingIds.has(tiktokIdMatch[1])) {\n      isDuplicate = true;\n      duplicateReason = `TikTok ID ${tiktokIdMatch[1]} уже в БД`;\n    }\n  }\n  \n  // Дополнительная проверка по автору и времени создания\n  if (!isDuplicate && video.authorMeta && video.createTime) {\n    for (const existingItem of existingVideos) {\n      const existing = existingItem.json;\n      // Если найдено видео с тем же автором и временем создания\n      if (existing.unique_id === video.authorMeta.name && \n          existing.timestamp === video.createTime) {\n        isDuplicate = true;\n        duplicateReason = 'Совпадение по автору и времени';\n        break;\n      }\n    }\n  }\n  \n  // Если это не дубликат, добавляем в результат\n  if (!isDuplicate) {\n    filteredVideos.push({\n      json: video,\n      pairedItem: item.pairedItem\n    });\n  } else {\n    duplicatesFound.push({\n      text: video.text ? video.text.substring(0, 50) : 'Без текста',\n      reason: duplicateReason\n    });\n  }\n}\n\n// Логирование для отладки\nconsole.log('\\n=== РЕЗУЛЬТАТЫ ФИЛЬТРАЦИИ ===');\nconsole.log(`Всего новых видео: ${newVideos.length}`);\nconsole.log(`Существующих в БД: ${existingVideos.length}`);\nconsole.log(`После фильтрации: ${filteredVideos.length}`);\nconsole.log(`Отфильтровано дубликатов: ${duplicatesFound.length}`);\n\nif (duplicatesFound.length > 0) {\n  console.log('\\n=== НАЙДЕННЫЕ ДУБЛИКАТЫ (первые 5) ===');\n  duplicatesFound.slice(0, 5).forEach((dup, index) => {\n    console.log(`${index + 1}. ${dup.reason}: \"${dup.text}...\"`);\n  });\n}\n\n// Возвращаем отфильтрованные видео\nreturn filteredVideos;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4740,
+        -2380
+      ],
+      "id": "97f643fa-cb69-49ef-ad3c-32678574bf42",
+      "name": "Duplicate Filter",
+      "executeOnce": false,
+      "notes": "// ======= УЛУЧШЕННАЯ ВЕРСИЯ С ПЕРЕБОРОМ ВСЕХ НОВОСТЕЙ И ОГРАНИЧЕНИЕМ ПОПЫТОК =======\n\nfunction filterNewsWithAdvancedChecks(existingPosts, searchResults) {\n  console.log('Начинаем фильтрацию новостей...');\n  \n  // 🛠️ РЕЖИМ ОТЛАДКИ - установите true для пропуска всех фильтров\n  const DEBUG_MODE = false; // Установите в true для отладки\n  \n  // Счетчик попыток перезапуска поиска\n  let retryCount = ($json.retry_count || 0);\n  const MAX_RETRIES = 3; // Максимум 3 попытки\n  \n  if (DEBUG_MODE) {\n    console.log('🛠️ РЕЖИМ ОТЛАДКИ АКТИВЕН - пропускаем все фильтры');\n    if (searchResults.organic_results && searchResults.organic_results.length > 0) {\n      const firstResult = searchResults.organic_results[0];\n      return [{\n        status: 'success',\n        title: firstResult.title,\n        description: firstResult.snippet,\n        link: firstResult.link,\n        position: firstResult.position || 1,\n        debug_mode: true,\n        restart_search: false,\n        retry_count: retryCount,\n        timestamp: new Date().toISOString()\n      }];\n    }\n  }\n  \n  // Проверяем входные данные\n  if (!searchResults || !searchResults.organic_results || searchResults.organic_results.length === 0) {\n    console.log('Нет результатов поиска для обработки');\n    return [{\n      status: 'no_search_results',\n      message: 'Нет результатов поиска для обработки',\n      restart_search: true,\n      retry_count: retryCount + 1,\n      processed_count: 0,\n      filtered_count: 0,\n      timestamp: new Date().toISOString()\n    }];\n  }\n\n  const existingLinks = existingPosts\n    .map(post => {\n      const linkMatch = post.content ? post.content.match(/\\[Подробнее\\]\\((.*?)\\)/) : null;\n      return linkMatch ? linkMatch[1] : null;\n    })\n    .filter(link => link !== null);\n  const existingLinksSet = new Set(existingLinks);\n  \n  const existingTitles = existingPosts\n    .map(post => {\n      const titleMatch = post.content ? post.content.match(/\\*(.*?)\\*/) : null;\n      return titleMatch ? titleMatch[1].toLowerCase() : null;\n    })\n    .filter(title => title !== null);\n\n  console.log(`Найдено ${existingLinks.length} существующих ссылок`);\n  console.log(`Найдено ${existingTitles.length} существующих заголовков`);\n  console.log(`К обработке: ${searchResults.organic_results.length} новостей`);\n  \n  // ДИАГНОСТИКА\n  console.log('🔍 СУЩЕСТВУЮЩИЕ ССЫЛКИ:');\n  existingLinks.forEach((link, i) => console.log(`  ${i+1}. ${link}`));\n  \n  console.log('🔍 НОВЫЕ ССЫЛКИ ИЗ ПОИСКА:');\n  searchResults.organic_results.forEach((result, i) => {\n    console.log(`  ${i+1}. ${result.title} | ${result.link}`);\n  });\n\n  // Проверка на проблемные URL (с учетом ошибок 403, PDF и репозитория)\n  function isProblematicUrl(url, title, snippet) {\n    const criticalPatterns = [\n      'nie jest już dostępne',\n      'zostało usunięte', \n      'nie istnieje',\n      'błąd 404',\n      'page not found',\n      'resource could not be found',\n      'strona nie została odnaleziona',\n      '/wp-admin/',\n      '/admin/login',\n      '/archive/old/',\n      '/archiwum/stare/',\n      'just a moment', // Индикатор Cloudflare 403\n      'enable javascript and cookies', // Индикатор 403\n      'pik.krakow.pl', // Исключение для pik.krakow.pl\n      'krakow.pl/getPdf', // Исключение PDF\n      'repozytorium.asp.krakow.pl' // Исключение архивных записей\n    ];\n    \n    const textToCheck = `${url} ${title} ${snippet}`.toLowerCase();\n    \n    for (const pattern of criticalPatterns) {\n      if (textToCheck.includes(pattern)) {\n        console.log(`🚫 Критическая проблема в URL: ${pattern} найден в ${url}`);\n        return true;\n      }\n    }\n    \n    return false;\n  }\n  \n  // Проверка на устаревшие URL\n  function isLikelyOutdated(url, title, snippet, publishedAt) {\n    const HOURS_LIMIT = 12; // Фильтр за 12 часов\n    const now = new Date();\n\n    // Проверка по publishedAt, если доступно\n    if (publishedAt) {\n      const pubDate = new Date(publishedAt);\n      const hoursDiff = (now - pubDate) / (1000 * 60 * 60);\n      if (hoursDiff > HOURS_LIMIT) {\n        console.log(`📅 Новость устарела на ${Math.round(hoursDiff)} часов: ${title}`);\n        return true;\n      }\n      return false;\n    }\n\n    // Fallback: проверка по URL\n    const dateMatches = url.match(/(\\d{4})[\\/\\-](\\d{1,2})[\\/\\-](\\d{1,2})/);\n    if (dateMatches) {\n      const urlDate = new Date(dateMatches[1], dateMatches[2] - 1, dateMatches[3]);\n      const daysDiff = (now - urlDate) / (1000 * 60 * 60 * 24);\n      if (daysDiff > 0.5) { // 0.5 дня = 12 часов\n        console.log(`📅 URL устарел на ${Math.round(daysDiff)} дней: ${url}`);\n        return true;\n      }\n    }\n    return false;\n  }\n  \n  // Проверка на стоп-слова\n  function hasStopWords(title, snippet) {\n    const stopWords = [\n      'wojna', 'wojenny', 'wojenna', 'wojen',\n      'morderstwo', 'morderstwa', 'mordercy', 'morderca',\n      'obrona', 'obrony', 'obronne',\n      'reklama', 'reklamy', 'reklamowy'\n    ];\n    \n    const textToCheck = `${title} ${snippet}`.toLowerCase();\n    \n    for (const word of stopWords) {\n      if (textToCheck.includes(word)) {\n        console.log(`🚫 Стоп-слово найдено: \"${word}\" в \"${textToCheck}\"`);\n        return true;\n      }\n    }\n    return false;\n  }\n  \n  // Сортировка результатов по свежести\n  const sortedResults = [...searchResults.organic_results].sort((a, b) => {\n    const aHasDate = /\\d{4}[\\/\\-]\\d{1,2}[\\/\\-]\\d{1,2}/.test(a.link);\n    const bHasDate = /\\d{4}[\\/\\-]\\d{1,2}[\\/\\-]\\d{1,2}/.test(b.link);\n    \n    if (!aHasDate && bHasDate) return -1;\n    if (aHasDate && !bHasDate) return 1;\n    \n    if (a.position && b.position) {\n      return a.position - b.position;\n    }\n    \n    return 0;\n  });\n  \n  const filteredReasons = {\n    duplicateLink: 0,\n    duplicateTitle: 0,\n    problematicUrl: 0,\n    outdated: 0,\n    stopWords: 0\n  };\n  \n  // Основной цикл: перебираем новости до первой валидной\n  for (let i = 0; i < sortedResults.length; i++) {\n    const result = sortedResults[i];\n    const link = result.link;\n    const title = result.title;\n    const snippet = result.snippet || '';\n    const publishedAt = result.publishedAt || null; // Поле времени публикации\n    \n    console.log(`Проверяем новость ${i + 1}/${sortedResults.length}: ${title}`);\n    \n    // Проверка на дубликат ссылки\n    const isLinkDuplicate = existingLinksSet.has(link);\n    if (isLinkDuplicate) {\n      filteredReasons.duplicateLink++;\n      console.log(`❌ Дубликат ссылки: ${title} | URL: ${link}`);\n      continue;\n    }\n    \n    // Проверка на дубликат заголовка\n    const normalizedTitle = title.toLowerCase().trim();\n    const isTitleDuplicate = existingTitles.some(existingTitle => {\n      const similarity = normalizedTitle === existingTitle || \n                        (normalizedTitle.length > 10 && existingTitle.includes(normalizedTitle)) ||\n                        (existingTitle.length > 10 && normalizedTitle.includes(existingTitle));\n      if (similarity) {\n        console.log(`🔍 Сравнение заголовков:`);\n        console.log(`   Новый: \"${normalizedTitle}\"`);\n        console.log(`   Существующий: \"${existingTitle}\"`);\n      }\n      return similarity;\n    });\n    if (isTitleDuplicate) {\n      filteredReasons.duplicateTitle++;\n      console.log(`❌ Дубликат заголовка: ${title}`);\n      continue;\n    }\n    \n    // Проверка на стоп-слова\n    if (hasStopWords(title, snippet)) {\n      filteredReasons.stopWords++;\n      console.log(`❌ Новость содержит стоп-слова: ${title}`);\n      continue;\n    }\n    \n    // Проверка на проблемные URL\n    if (isProblematicUrl(link, title, snippet)) {\n      filteredReasons.problematicUrl++;\n      console.log(`❌ Проблемная ссылка: ${title}`);\n      continue;\n    }\n    \n    // Проверка на устаревшие URL\n    if (isLikelyOutdated(link, title, snippet, publishedAt)) {\n      filteredReasons.outdated++;\n      console.log(`❌ Устаревшая новость: ${title}`);\n      continue;\n    }\n    \n    // Новость валидна\n    console.log(`✅ Найдена валидная новость: ${title}`);\n    \n    return [{\n      status: 'success',\n      title: title,\n      description: snippet,\n      link: link,\n      position: result.position || i + 1,\n      source: result.source || '',\n      isFiltered: true,\n      processed_count: sortedResults.length,\n      checked_count: i + 1,\n      filtered_count: i,\n      filter_reasons: filteredReasons,\n      restart_search: false,\n      retry_count: retryCount,\n      timestamp: new Date().toISOString()\n    }];\n  }\n  \n  // Если все новости отфильтрованы\n  retryCount++;\n  if (retryCount >= MAX_RETRIES) {\n    console.log(`❌ Достигнут лимит попыток (${retryCount}). Останавливаем цикл.`);\n    return [{\n      status: 'max_retries',\n      message: 'Достигнут лимит попыток поиска новостей',\n      processed_count: sortedResults.length,\n      filtered_count: sortedResults.length,\n      retry_count: retryCount,\n      restart_search: false,\n      timestamp: new Date().toISOString()\n    }];\n  }\n  \n  console.log(`❌ Все ${sortedResults.length} новостей отфильтрованы. Попытка ${retryCount}.`);\n  \n  return [{\n    status: 'all_filtered',\n    message: 'Все новости отфильтрованы, запускаем новый поиск',\n    processed_count: sortedResults.length,\n    filtered_count: sortedResults.length,\n    retry_count: retryCount,\n    restart_search: true,\n    timestamp: new Date().toISOString()\n  }];\n}\n\n// ======= ОСНОВНАЯ ФУНКЦИЯ ДЛЯ N8N =======\ntry {\n  // Получаем входные данные\n  const allInputs = $input.all();\n  console.log(`Получено ${allInputs.length} входных элементов`);\n  \n  // Разделяем существующие посты и результаты поиска\n  const existingPosts = allInputs\n    .filter(item => item.json && (item.json.id || item.json.post_id))\n    .map(item => item.json);\n  \n  const searchResultsItem = allInputs.find(item => \n    item.json && item.json.organic_results\n  );\n  \n  if (!searchResultsItem) {\n    console.log('Не найдены результаты поиска');\n    return [{\n      status: 'error',\n      error_type: 'no_search_data',\n      message: 'Не найдены данные поиска в входных данных',\n      received_inputs: allInputs.length,\n      restart_search: true,\n      timestamp: new Date().toISOString()\n    }];\n  }\n  \n  const searchResults = searchResultsItem.json;\n  console.log(`Найдено существующих постов: ${existingPosts.length}`);\n  console.log(`Результатов поиска: ${searchResults.organic_results ? searchResults.organic_results.length : 0}`);\n  \n  // Выполняем фильтрацию\n  const result = filterNewsWithAdvancedChecks(existingPosts, searchResults);\n  \n  console.log('Фильтрация завершена');\n  console.log(`Статус: ${result[0].status}`);\n  console.log(`Перезапуск поиска: ${result[0].restart_search}`);\n  \n  return result;\n  \n} catch (error) {\n  console.error('Ошибка в процессе фильтрации:', error);\n  \n  let retryCount = ($json.retry_count || 0) + 1;\n  const MAX_RETRIES = 5;\n  \n  if (retryCount >= MAX_RETRIES) {\n    console.log(`❌ Достигнут лимит попыток (${retryCount}) после ошибки.`);\n    return [{\n      status: 'error',\n      error_type: 'max_retries',\n      message: 'Достигнут лимит попыток после ошибки',\n      stack: error.stack,\n      retry_count: retryCount,\n      restart_search: false,\n      timestamp: new Date().toISOString()\n    }];\n  }\n  \n  return [{\n    status: 'error',\n    error_type: 'processing_error',\n    message: error.message,\n    stack: error.stack,\n    retry_count: retryCount,\n    restart_search: true,\n    timestamp: new Date().toISOString()\n  }];\n}\n\n----------------------\n\n📋 Пошаговая инструкция:\n"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.videoMeta.subtitleLinks[0].downloadLink }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4440,
+        -2380
+      ],
+      "id": "082b9b2e-ad02-4c2c-82b6-50a5e9b87a5e",
+      "name": "Download TikTok Sub"
+    },
+    {
+      "parameters": {
+        "tableId": "videos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "video_url",
+              "fieldValue": "={{ $('Duplicate Filter').item.json.mediaUrls[0] }}"
+            },
+            {
+              "fieldId": "post_url",
+              "fieldValue": "={{ $('Duplicate Filter').item.json.mediaUrls[0] }}"
+            },
+            {
+              "fieldId": "caption",
+              "fieldValue": "={{ $json.data }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -4160,
+        -2380
+      ],
+      "id": "470b3e32-fb17-4477-8caf-fd9cd4ce0f5e",
+      "name": "Add to DB",
+      "alwaysOutputData": false,
+      "credentials": {
+        "supabaseApi": {
+          "id": "G91LxvStJeEUrkzl",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "short_code",
+              "condition": "eq",
+              "keyValue": "={{ $json.shortCode }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -5480,
+        -1760
+      ],
+      "id": "6748a748-d7e1-4e35-affc-348d2135fa0b",
+      "name": "Get Links1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "G91LxvStJeEUrkzl",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -5240,
+        -1900
+      ],
+      "id": "e4f5f531-eb6d-4b08-82ad-4510c0d98e60",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем все элементы из Merge ноды\nconst allItems = $input.all();\n\n// Создаем набор существующих short_code из базы данных\nconst existingShortCodes = new Set();\n\n// Сначала проходим по элементам из БД и собираем их short_code\nallItems.forEach(item => {\n    if (item.json.id !== undefined && typeof item.json.id === 'number') {\n        // Это элемент из базы данных\n        if (item.json.short_code) {\n            existingShortCodes.add(item.json.short_code);\n        }\n    }\n});\n\n// Фильтруем только новые элементы из парсинга\nconst newItems = allItems.filter(item => {\n    // Это элементы из парсинга (у них нет числового ID)\n    if (item.json.id === undefined || typeof item.json.id !== 'number') {\n        const shortCode = item.json.shortCode || item.json.short_code;\n        return shortCode && !existingShortCodes.has(shortCode);\n    }\n    return false; // Пропускаем элементы из БД\n});\n\n// Статистика\nconsole.log('='.repeat(50));\nconsole.log('🎯 ФИЛЬТРАЦИЯ НОВЫХ ВИДЕО');\nconsole.log('='.repeat(50));\nconsole.log(`✅ Всего элементов: ${allItems.length}`);\nconsole.log(`✅ Элементов в базе: ${existingShortCodes.size}`);\nconsole.log(`✅ Новых элементов: ${newItems.length}`);\n\n// Выводим первые 5 новых элементов для проверки\nconsole.log('\\n🔍 Первые 5 новых видео:');\nnewItems.slice(0, 5).forEach((item, index) => {\n    const shortCode = item.json.shortCode || item.json.short_code;\n    console.log(`${index + 1}. shortCode: ${shortCode}`);\n});\n\nreturn newItems;\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4900,
+        -1900
+      ],
+      "id": "b14aa8c8-8b67-48bf-b532-6eab03e56cf2",
+      "name": "Duplicate Filter1",
+      "executeOnce": false,
+      "notes": "// ======= УЛУЧШЕННАЯ ВЕРСИЯ С ПЕРЕБОРОМ ВСЕХ НОВОСТЕЙ И ОГРАНИЧЕНИЕМ ПОПЫТОК =======\n\nfunction filterNewsWithAdvancedChecks(existingPosts, searchResults) {\n  console.log('Начинаем фильтрацию новостей...');\n  \n  // 🛠️ РЕЖИМ ОТЛАДКИ - установите true для пропуска всех фильтров\n  const DEBUG_MODE = false; // Установите в true для отладки\n  \n  // Счетчик попыток перезапуска поиска\n  let retryCount = ($json.retry_count || 0);\n  const MAX_RETRIES = 3; // Максимум 3 попытки\n  \n  if (DEBUG_MODE) {\n    console.log('🛠️ РЕЖИМ ОТЛАДКИ АКТИВЕН - пропускаем все фильтры');\n    if (searchResults.organic_results && searchResults.organic_results.length > 0) {\n      const firstResult = searchResults.organic_results[0];\n      return [{\n        status: 'success',\n        title: firstResult.title,\n        description: firstResult.snippet,\n        link: firstResult.link,\n        position: firstResult.position || 1,\n        debug_mode: true,\n        restart_search: false,\n        retry_count: retryCount,\n        timestamp: new Date().toISOString()\n      }];\n    }\n  }\n  \n  // Проверяем входные данные\n  if (!searchResults || !searchResults.organic_results || searchResults.organic_results.length === 0) {\n    console.log('Нет результатов поиска для обработки');\n    return [{\n      status: 'no_search_results',\n      message: 'Нет результатов поиска для обработки',\n      restart_search: true,\n      retry_count: retryCount + 1,\n      processed_count: 0,\n      filtered_count: 0,\n      timestamp: new Date().toISOString()\n    }];\n  }\n\n  const existingLinks = existingPosts\n    .map(post => {\n      const linkMatch = post.content ? post.content.match(/\\[Подробнее\\]\\((.*?)\\)/) : null;\n      return linkMatch ? linkMatch[1] : null;\n    })\n    .filter(link => link !== null);\n  const existingLinksSet = new Set(existingLinks);\n  \n  const existingTitles = existingPosts\n    .map(post => {\n      const titleMatch = post.content ? post.content.match(/\\*(.*?)\\*/) : null;\n      return titleMatch ? titleMatch[1].toLowerCase() : null;\n    })\n    .filter(title => title !== null);\n\n  console.log(`Найдено ${existingLinks.length} существующих ссылок`);\n  console.log(`Найдено ${existingTitles.length} существующих заголовков`);\n  console.log(`К обработке: ${searchResults.organic_results.length} новостей`);\n  \n  // ДИАГНОСТИКА\n  console.log('🔍 СУЩЕСТВУЮЩИЕ ССЫЛКИ:');\n  existingLinks.forEach((link, i) => console.log(`  ${i+1}. ${link}`));\n  \n  console.log('🔍 НОВЫЕ ССЫЛКИ ИЗ ПОИСКА:');\n  searchResults.organic_results.forEach((result, i) => {\n    console.log(`  ${i+1}. ${result.title} | ${result.link}`);\n  });\n\n  // Проверка на проблемные URL (с учетом ошибок 403, PDF и репозитория)\n  function isProblematicUrl(url, title, snippet) {\n    const criticalPatterns = [\n      'nie jest już dostępne',\n      'zostało usunięte', \n      'nie istnieje',\n      'błąd 404',\n      'page not found',\n      'resource could not be found',\n      'strona nie została odnaleziona',\n      '/wp-admin/',\n      '/admin/login',\n      '/archive/old/',\n      '/archiwum/stare/',\n      'just a moment', // Индикатор Cloudflare 403\n      'enable javascript and cookies', // Индикатор 403\n      'pik.krakow.pl', // Исключение для pik.krakow.pl\n      'krakow.pl/getPdf', // Исключение PDF\n      'repozytorium.asp.krakow.pl' // Исключение архивных записей\n    ];\n    \n    const textToCheck = `${url} ${title} ${snippet}`.toLowerCase();\n    \n    for (const pattern of criticalPatterns) {\n      if (textToCheck.includes(pattern)) {\n        console.log(`🚫 Критическая проблема в URL: ${pattern} найден в ${url}`);\n        return true;\n      }\n    }\n    \n    return false;\n  }\n  \n  // Проверка на устаревшие URL\n  function isLikelyOutdated(url, title, snippet, publishedAt) {\n    const HOURS_LIMIT = 12; // Фильтр за 12 часов\n    const now = new Date();\n\n    // Проверка по publishedAt, если доступно\n    if (publishedAt) {\n      const pubDate = new Date(publishedAt);\n      const hoursDiff = (now - pubDate) / (1000 * 60 * 60);\n      if (hoursDiff > HOURS_LIMIT) {\n        console.log(`📅 Новость устарела на ${Math.round(hoursDiff)} часов: ${title}`);\n        return true;\n      }\n      return false;\n    }\n\n    // Fallback: проверка по URL\n    const dateMatches = url.match(/(\\d{4})[\\/\\-](\\d{1,2})[\\/\\-](\\d{1,2})/);\n    if (dateMatches) {\n      const urlDate = new Date(dateMatches[1], dateMatches[2] - 1, dateMatches[3]);\n      const daysDiff = (now - urlDate) / (1000 * 60 * 60 * 24);\n      if (daysDiff > 0.5) { // 0.5 дня = 12 часов\n        console.log(`📅 URL устарел на ${Math.round(daysDiff)} дней: ${url}`);\n        return true;\n      }\n    }\n    return false;\n  }\n  \n  // Проверка на стоп-слова\n  function hasStopWords(title, snippet) {\n    const stopWords = [\n      'wojna', 'wojenny', 'wojenna', 'wojen',\n      'morderstwo', 'morderstwa', 'mordercy', 'morderca',\n      'obrona', 'obrony', 'obronne',\n      'reklama', 'reklamy', 'reklamowy'\n    ];\n    \n    const textToCheck = `${title} ${snippet}`.toLowerCase();\n    \n    for (const word of stopWords) {\n      if (textToCheck.includes(word)) {\n        console.log(`🚫 Стоп-слово найдено: \"${word}\" в \"${textToCheck}\"`);\n        return true;\n      }\n    }\n    return false;\n  }\n  \n  // Сортировка результатов по свежести\n  const sortedResults = [...searchResults.organic_results].sort((a, b) => {\n    const aHasDate = /\\d{4}[\\/\\-]\\d{1,2}[\\/\\-]\\d{1,2}/.test(a.link);\n    const bHasDate = /\\d{4}[\\/\\-]\\d{1,2}[\\/\\-]\\d{1,2}/.test(b.link);\n    \n    if (!aHasDate && bHasDate) return -1;\n    if (aHasDate && !bHasDate) return 1;\n    \n    if (a.position && b.position) {\n      return a.position - b.position;\n    }\n    \n    return 0;\n  });\n  \n  const filteredReasons = {\n    duplicateLink: 0,\n    duplicateTitle: 0,\n    problematicUrl: 0,\n    outdated: 0,\n    stopWords: 0\n  };\n  \n  // Основной цикл: перебираем новости до первой валидной\n  for (let i = 0; i < sortedResults.length; i++) {\n    const result = sortedResults[i];\n    const link = result.link;\n    const title = result.title;\n    const snippet = result.snippet || '';\n    const publishedAt = result.publishedAt || null; // Поле времени публикации\n    \n    console.log(`Проверяем новость ${i + 1}/${sortedResults.length}: ${title}`);\n    \n    // Проверка на дубликат ссылки\n    const isLinkDuplicate = existingLinksSet.has(link);\n    if (isLinkDuplicate) {\n      filteredReasons.duplicateLink++;\n      console.log(`❌ Дубликат ссылки: ${title} | URL: ${link}`);\n      continue;\n    }\n    \n    // Проверка на дубликат заголовка\n    const normalizedTitle = title.toLowerCase().trim();\n    const isTitleDuplicate = existingTitles.some(existingTitle => {\n      const similarity = normalizedTitle === existingTitle || \n                        (normalizedTitle.length > 10 && existingTitle.includes(normalizedTitle)) ||\n                        (existingTitle.length > 10 && normalizedTitle.includes(existingTitle));\n      if (similarity) {\n        console.log(`🔍 Сравнение заголовков:`);\n        console.log(`   Новый: \"${normalizedTitle}\"`);\n        console.log(`   Существующий: \"${existingTitle}\"`);\n      }\n      return similarity;\n    });\n    if (isTitleDuplicate) {\n      filteredReasons.duplicateTitle++;\n      console.log(`❌ Дубликат заголовка: ${title}`);\n      continue;\n    }\n    \n    // Проверка на стоп-слова\n    if (hasStopWords(title, snippet)) {\n      filteredReasons.stopWords++;\n      console.log(`❌ Новость содержит стоп-слова: ${title}`);\n      continue;\n    }\n    \n    // Проверка на проблемные URL\n    if (isProblematicUrl(link, title, snippet)) {\n      filteredReasons.problematicUrl++;\n      console.log(`❌ Проблемная ссылка: ${title}`);\n      continue;\n    }\n    \n    // Проверка на устаревшие URL\n    if (isLikelyOutdated(link, title, snippet, publishedAt)) {\n      filteredReasons.outdated++;\n      console.log(`❌ Устаревшая новость: ${title}`);\n      continue;\n    }\n    \n    // Новость валидна\n    console.log(`✅ Найдена валидная новость: ${title}`);\n    \n    return [{\n      status: 'success',\n      title: title,\n      description: snippet,\n      link: link,\n      position: result.position || i + 1,\n      source: result.source || '',\n      isFiltered: true,\n      processed_count: sortedResults.length,\n      checked_count: i + 1,\n      filtered_count: i,\n      filter_reasons: filteredReasons,\n      restart_search: false,\n      retry_count: retryCount,\n      timestamp: new Date().toISOString()\n    }];\n  }\n  \n  // Если все новости отфильтрованы\n  retryCount++;\n  if (retryCount >= MAX_RETRIES) {\n    console.log(`❌ Достигнут лимит попыток (${retryCount}). Останавливаем цикл.`);\n    return [{\n      status: 'max_retries',\n      message: 'Достигнут лимит попыток поиска новостей',\n      processed_count: sortedResults.length,\n      filtered_count: sortedResults.length,\n      retry_count: retryCount,\n      restart_search: false,\n      timestamp: new Date().toISOString()\n    }];\n  }\n  \n  console.log(`❌ Все ${sortedResults.length} новостей отфильтрованы. Попытка ${retryCount}.`);\n  \n  return [{\n    status: 'all_filtered',\n    message: 'Все новости отфильтрованы, запускаем новый поиск',\n    processed_count: sortedResults.length,\n    filtered_count: sortedResults.length,\n    retry_count: retryCount,\n    restart_search: true,\n    timestamp: new Date().toISOString()\n  }];\n}\n\n// ======= ОСНОВНАЯ ФУНКЦИЯ ДЛЯ N8N =======\ntry {\n  // Получаем входные данные\n  const allInputs = $input.all();\n  console.log(`Получено ${allInputs.length} входных элементов`);\n  \n  // Разделяем существующие посты и результаты поиска\n  const existingPosts = allInputs\n    .filter(item => item.json && (item.json.id || item.json.post_id))\n    .map(item => item.json);\n  \n  const searchResultsItem = allInputs.find(item => \n    item.json && item.json.organic_results\n  );\n  \n  if (!searchResultsItem) {\n    console.log('Не найдены результаты поиска');\n    return [{\n      status: 'error',\n      error_type: 'no_search_data',\n      message: 'Не найдены данные поиска в входных данных',\n      received_inputs: allInputs.length,\n      restart_search: true,\n      timestamp: new Date().toISOString()\n    }];\n  }\n  \n  const searchResults = searchResultsItem.json;\n  console.log(`Найдено существующих постов: ${existingPosts.length}`);\n  console.log(`Результатов поиска: ${searchResults.organic_results ? searchResults.organic_results.length : 0}`);\n  \n  // Выполняем фильтрацию\n  const result = filterNewsWithAdvancedChecks(existingPosts, searchResults);\n  \n  console.log('Фильтрация завершена');\n  console.log(`Статус: ${result[0].status}`);\n  console.log(`Перезапуск поиска: ${result[0].restart_search}`);\n  \n  return result;\n  \n} catch (error) {\n  console.error('Ошибка в процессе фильтрации:', error);\n  \n  let retryCount = ($json.retry_count || 0) + 1;\n  const MAX_RETRIES = 5;\n  \n  if (retryCount >= MAX_RETRIES) {\n    console.log(`❌ Достигнут лимит попыток (${retryCount}) после ошибки.`);\n    return [{\n      status: 'error',\n      error_type: 'max_retries',\n      message: 'Достигнут лимит попыток после ошибки',\n      stack: error.stack,\n      retry_count: retryCount,\n      restart_search: false,\n      timestamp: new Date().toISOString()\n    }];\n  }\n  \n  return [{\n    status: 'error',\n    error_type: 'processing_error',\n    message: error.message,\n    stack: error.stack,\n    retry_count: retryCount,\n    restart_search: true,\n    timestamp: new Date().toISOString()\n  }];\n}\n\n----------------------\n\n📋 Пошаговая инструкция:\n"
+    }
+  ],
+  "connections": {
+    "Instagram Scraper": {
+      "main": [
+        [
+          {
+            "node": "Instagram Virality Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram Virality Filter": {
+      "main": [
+        [
+          {
+            "node": "Get Links1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Instagram Videos": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Generate Unique ID5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Instagram Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Instagram Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Instagram Video": {
+      "main": [
+        [
+          {
+            "node": "Add Instagram to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Instagram to DB": {
+      "main": [
+        [
+          {
+            "node": "Split Instagram Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Unique ID5": {
+      "main": [
+        [
+          {
+            "node": "Download Instagram Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TikTok Scraper": {
+      "main": [
+        [
+          {
+            "node": "Filter & Score Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Score Videos": {
+      "main": [
+        [
+          {
+            "node": "Get Links",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Scraper1": {
+      "main": [
+        [
+          {
+            "node": "TikTok Scraper",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Instagram Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Links": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Duplicate Filter": {
+      "main": [
+        [
+          {
+            "node": "Download TikTok Sub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download TikTok Sub": {
+      "main": [
+        [
+          {
+            "node": "Add to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to DB": {
+      "main": [
+        []
+      ]
+    },
+    "Get Links1": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Filter1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Filter1": {
+      "main": [
+        [
+          {
+            "node": "Split Instagram Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "e1c456741f13b772b8094e1b530691cf5c07795176582e40dc988a9c967c6f8a"
+  }
+}
